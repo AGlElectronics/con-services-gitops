@@ -1,12 +1,14 @@
 {{- /*
-The platform, sync waves 0 to 5: namespaces, CloudNativePG, Keycloak, Den.
+The platform, sync waves 0 to 5: namespaces, Keycloak, PostgreSQL, Den.
+The CloudNativePG operator and its Barman Cloud plugin are cluster
+prerequisites.
 */ -}}
 {{- $v := .Values }}
 {{- $meta := include "root.moduleMeta" . | fromYaml }}
 {{- $enabled := fromJsonArray (include "root.enabledModules" .) }}
 ---
-# Namespaces cnpg-system, conservices-data, conservices-identity with their
-# labels, default-deny and DNS policies. No finalizer: deleting this
+# Namespaces conservices-data and conservices-identity with their labels,
+# default-deny and DNS policies. No finalizer: deleting this
 # Application must never delete the namespaces (and the database in them).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -21,60 +23,6 @@ spec:
     {{- include "root.repoSource" (dict "root" $ "path" "components/platform-namespaces") | nindent 4 }}
   destination:
     server: https://kubernetes.default.svc
-  {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
----
-# CloudNativePG operator 1.30.1 with its CRDs.
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: cnpg-operator
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  project: default
-  sources:
-    - repoURL: https://cloudnative-pg.github.io/charts
-      chart: cloudnative-pg
-      targetRevision: 0.29.1
-      helm:
-        releaseName: cnpg-operator
-        valueFiles:
-          - $values/values/cnpg-operator.yaml
-        {{- $op := dict "replicaCount" $v.cnpg.operator.replicas "resources" $v.cnpg.operator.resources }}
-        valuesObject:
-          {{- toYaml (mergeOverwrite $op $v.cnpg.operator.values) | nindent 10 }}
-    {{- include "root.valuesRef" . | nindent 4 }}
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: cnpg-system
-  {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
----
-# Barman Cloud plugin: WAL archiving and base backups of PostgreSQL to S3.
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: cnpg-barman-cloud
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "2"
-spec:
-  project: default
-  sources:
-    - repoURL: https://cloudnative-pg.github.io/charts
-      chart: plugin-barman-cloud
-      targetRevision: 0.8.1
-      helm:
-        releaseName: cnpg-barman-cloud
-        valueFiles:
-          - $values/values/cnpg-barman-cloud.yaml
-        {{- $bc := dict "replicaCount" $v.cnpg.barmanCloud.replicas "resources" $v.cnpg.barmanCloud.resources }}
-        valuesObject:
-          {{- toYaml (mergeOverwrite $bc $v.cnpg.barmanCloud.values) | nindent 10 }}
-    {{- include "root.valuesRef" . | nindent 4 }}
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: cnpg-system
   {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
 ---
 # Keycloak Operator 26.8.2 (CRDs, RBAC, Deployment) in conservices-identity.
@@ -131,6 +79,7 @@ spec:
               "size" $p.storage.size
               "walSize" $p.storage.walSize)
             "roles" $roles
+            "operatorNamespace" $p.operatorNamespace
             "backup" (dict
               "endpoint" $s3.backupEndpoint
               "region" $s3.backupRegion
@@ -138,7 +87,7 @@ spec:
               "fqdns" $s3.backupFqdns
               "schedule" $p.backup.schedule
               "retention" $p.backup.retention
-              "sidecarResources" $v.cnpg.barmanCloud.sidecarResources) }}
+              "sidecarResources" $p.backup.sidecarResources) }}
       valuesObject:
         {{- toYaml $pg | nindent 8 }}
   destination:

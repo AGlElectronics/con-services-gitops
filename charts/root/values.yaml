@@ -8,7 +8,7 @@
 
 # Your domain. Apps live on <app>.<domain>, Rally on events.<domain>,
 # Keycloak on auth.<domain> (admin console: auth-admin.<domain>), Argo CD
-# and OpenBao on argocd.<domain> and bao.<domain> (internal Gateway).
+# on argocd.<domain> (internal Gateway).
 domain: change-me
 
 git:
@@ -31,9 +31,6 @@ acme:
     #             they need yourself).
     provider: cloudflare
     solvers: []
-  # Resolvers cert-manager asks when checking DNS-01 records. Public ones
-  # avoid answers from split-horizon DNS.
-  recursiveNameservers: "1.1.1.1:53,8.8.8.8:53"
 
 s3:
   # Managed S3-compatible object storage for files (Den, Stash, Rally,
@@ -151,7 +148,6 @@ oidcHairpin:
 
 # Admin UIs on the internal Gateway.
 adminRoutes:
-  openbao: true
   # Only if Longhorn is installed. Its UI has no login.
   longhorn: false
   # Only if Hubble UI is installed (namespace kube-system).
@@ -165,65 +161,49 @@ storage:
   className: ""
   longhornSingle:
     # true: create the StorageClass longhorn-single (one Longhorn replica,
-    # data on the pod's node) and use it for PostgreSQL and OpenBao, which
-    # replicate themselves.
+    # data on the pod's node) and use it for PostgreSQL, which replicates
+    # itself.
     enabled: false
 
-# --- Platform components ----------------------------------------------------
-# Every component: replicas, resources (requests and limits), and "values"
-# for the upstream chart, merged last.
-
-certManager:
-  replicas: 2
-  resources:
-    controller: { requests: { cpu: 50m, memory: 128Mi }, limits: { cpu: 500m, memory: 512Mi } }
-    webhook: { requests: { cpu: 20m, memory: 64Mi }, limits: { cpu: 200m, memory: 128Mi } }
-    cainjector: { requests: { cpu: 50m, memory: 128Mi }, limits: { cpu: 500m, memory: 512Mi } }
-    startupapicheck: { requests: { cpu: 10m, memory: 32Mi }, limits: { cpu: 100m, memory: 64Mi } }
-  values: {}
-
-trustManager:
-  replicas: 2
-  resources:
-    controller: { requests: { cpu: 25m, memory: 64Mi }, limits: { cpu: 200m, memory: 256Mi } }
-    defaultPackage: { requests: { cpu: 10m, memory: 32Mi }, limits: { cpu: 100m, memory: 64Mi } }
-  values: {}
+# --- Cluster prerequisites --------------------------------------------------
+# cert-manager, trust-manager, External Secrets Operator, OpenBao and the
+# CloudNativePG operator are installed and run by the cluster operator, not
+# by this template. These settings say where to find them.
+# Reference: https://aglelectronics.github.io/con-services/deploy/prerequisites/
 
 externalSecrets:
-  replicas: 2
-  resources:
-    controller: { requests: { cpu: 50m, memory: 128Mi }, limits: { cpu: 500m, memory: 512Mi } }
-    webhook: { requests: { cpu: 20m, memory: 64Mi }, limits: { cpu: 200m, memory: 128Mi } }
-    certController: { requests: { cpu: 20m, memory: 64Mi }, limits: { cpu: 200m, memory: 256Mi } }
-  values: {}
+  # Namespace and service account of External Secrets Operator. The
+  # ClusterSecretStore "openbao" logs in to OpenBao as this service account.
+  namespace: external-secrets
+  serviceAccount: external-secrets
 
 openbao:
-  # Raft voters. 3 survive the loss of one.
-  replicas: 3
-  resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 512Mi } }
-  storage:
-    # Empty: longhorn-single with storage.longhornSingle.enabled, else
-    # storage.className.
-    className: ""
-    dataSize: 10Gi
-    auditSize: 5Gi
-  values: {}
+  # OpenBao's API as seen from External Secrets Operator. Use an address that
+  # reaches only the unsealed leader (upstream chart: Service openbao-active).
+  server: https://openbao-active.openbao.svc:8200
+  # Mount path of the KV version 2 engine Con Services uses.
+  kvPath: kv
+  # The CA certificate that signed OpenBao's TLS certificate. Namespace
+  # empty: externalSecrets.namespace. Name empty: no CA (OpenBao has a
+  # publicly trusted certificate).
+  caBundle:
+    kind: ConfigMap
+    name: openbao-ca
+    key: ca.crt
+    namespace: ""
+  # Kubernetes auth method: mount path and role (created by
+  # bootstrap/scripts/openbao-configure.sh).
+  auth:
+    mountPath: kubernetes
+    role: external-secrets
 
-cnpg:
-  operator:
-    replicas: 2
-    resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 500m, memory: 512Mi } }
-    values: {}
-  barmanCloud:
-    replicas: 1
-    resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { cpu: 200m, memory: 256Mi } }
-    # The sidecar it adds to every PostgreSQL pod (WAL archiving).
-    sidecarResources: { requests: { cpu: 50m, memory: 128Mi }, limits: { cpu: 500m, memory: 512Mi } }
-    values: {}
+# --- Platform components ----------------------------------------------------
 
 postgres:
   instances: 3
   resources: { requests: { cpu: 250m, memory: 1Gi }, limits: { cpu: "2", memory: 1Gi } }
+  # Namespace of the CloudNativePG operator (a prerequisite).
+  operatorNamespace: cnpg-system
   storage:
     className: ""
     size: 20Gi
@@ -232,6 +212,8 @@ postgres:
     # Base backup schedule (six fields, seconds first) and retention.
     schedule: "0 15 2 * * *"
     retention: 30d
+    # The Barman Cloud sidecar in every PostgreSQL pod (WAL archiving).
+    sidecarResources: { requests: { cpu: 50m, memory: 128Mi }, limits: { cpu: 500m, memory: 512Mi } }
 
 keycloakOperator:
   resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }

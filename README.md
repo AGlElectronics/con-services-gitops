@@ -3,8 +3,13 @@
 A blank production template for running Con Services on Kubernetes with
 [Argo CD](https://argo-cd.readthedocs.io/). You make your own private copy,
 fill in **one settings file, `cluster.yaml`**, and Argo CD installs and
-keeps running everything else: certificates, secrets, the database,
-sign-in, Den and the modules.
+keeps running everything else: certificates, the database, sign-in, Den
+and the modules.
+
+Cluster-wide services are **prerequisites** that the cluster operator runs
+and the template only uses: cert-manager with trust-manager, External
+Secrets Operator, OpenBao, and the CloudNativePG operator with its Barman
+Cloud plugin.
 
 Full guide: <https://aglelectronics.github.io/con-services/deploy/>
 
@@ -12,8 +17,10 @@ Full guide: <https://aglelectronics.github.io/con-services/deploy/>
 
 You need a Kubernetes cluster that meets the
 [prerequisites](https://aglelectronics.github.io/con-services/deploy/prerequisites/)
-(3+ nodes, Cilium with the Gateway API, a default StorageClass), an S3
-service, a domain, and `kubectl`, `helm` and `git` on your computer.
+(3+ nodes, Cilium with the Gateway API, a default StorageClass,
+cert-manager, trust-manager, External Secrets Operator, an initialised and
+unsealed OpenBao, CloudNativePG), an S3 service, a domain, and `kubectl`,
+`helm`, `git` and `jq` on your computer.
 
 1. **Copy the template.** On GitHub, **Use this template → Create a new
    repository**, make it **private**, and clone it.
@@ -39,17 +46,24 @@ service, a domain, and `kubectl`, `helm` and `git` on your computer.
       -n argocd --create-namespace -f bootstrap/argocd/values.yaml
     ```
 
-4. **Commit, push, and create the root Application:**
+4. **Prepare OpenBao and store the secrets** with a token from your
+   OpenBao administrator (the script asks for it if `BAO_TOKEN` is not set):
+
+    ```sh
+    bash bootstrap/scripts/openbao-configure.sh
+    bash bootstrap/scripts/openbao-seed.sh
+    ```
+
+5. **Commit, push, and create the root Application.** The script first
+   checks that the prerequisites are installed:
 
     ```sh
     git add cluster.yaml && git commit -m "Configure cluster" && git push
     bash bootstrap/install-root.sh
     ```
 
-5. **Do the steps only a person can do:** initialise and unseal OpenBao and
-   store the secrets (`bootstrap/scripts/openbao-init.sh`, then
-   `openbao-seed.sh`), create the DNS records and the S3 buckets. Argo CD
-   waits for them and continues by itself.
+6. **Do the steps only a person can do:** create the DNS records and the
+   S3 buckets. Argo CD waits for them and continues by itself.
 
 Each step is explained, with expected output and troubleshooting, in the
 [installation guide](https://aglelectronics.github.io/con-services/deploy/argocd/).
@@ -59,16 +73,17 @@ Each step is explained, with expected output and troubleshooting, in the
 | Layer | Components | High availability (default) |
 | --- | --- | --- |
 | Delivery | Argo CD, managing itself after the first install | Redis HA, 2+ replicas of server and repo-server |
-| Certificates | cert-manager (Let's Encrypt, internal CA), trust-manager | 2 replicas, webhook PDB |
-| Secrets | OpenBao (Raft), External Secrets Operator | 3 OpenBao voters, ESO 2 replicas |
+| Certificates | Let's Encrypt ClusterIssuers and the Con Services internal CA, on the cluster's cert-manager and trust-manager | |
+| Secrets | ClusterSecretStore `openbao` for the cluster's OpenBao and External Secrets Operator | |
 | Network | Gateway API (public and internal Gateway), Cilium network policies; optional Cilium LB IPAM | default-deny in every Con Services namespace |
-| Data | CloudNativePG with backups to S3 (Barman Cloud plugin); files at a **managed S3 service** | 3 PostgreSQL instances, quorum synchronous replication |
+| Data | PostgreSQL cluster on the cluster's CloudNativePG with backups to S3 (Barman Cloud plugin); files at a **managed S3 service** | 3 PostgreSQL instances, quorum synchronous replication |
 | Identity | Keycloak via the Keycloak Operator | 2 instances, shared sessions |
 | Apps | Den and the modules, from the Helm charts of `AGlElectronics/con-services` | web apps 2+ replicas with PDBs |
 | CI (optional) | Actions Runner Controller with rootless BuildKit | scale to zero |
 
 Every container has CPU and memory requests and limits. Defaults total
-about 4.2 CPU and 11 GiB of requests; see
+about 3 CPU and 8.6 GiB of requests with five modules, not counting the
+prerequisites; see
 [Sizing](https://aglelectronics.github.io/con-services/deploy/sizing/).
 
 ## Layout
@@ -80,12 +95,12 @@ charts/
     values.yaml               Defaults of every setting (override in cluster.yaml)
     values.schema.json        Rejects unknown or misspelt keys
   module-extras/              ExternalSecrets and access configs of Den and the modules
-  postgres/, keycloak/, gateway/, letsencrypt/, ...
+  postgres/, keycloak/, gateway/, secret-store/, letsencrypt/, ...
                               Small charts for the objects specific to an installation
-values/                       Fixed Helm values of the upstream charts (cert-manager, OpenBao, ...)
+values/                       Fixed Helm values of the upstream charts (Actions Runner Controller)
 components/                   Fixed Kustomize folders (internal CA, namespaces, ...)
 bootstrap/                    Used by hand: install-root.sh, Argo CD values,
-                              OpenBao scripts, example-k3s/ (an example cluster)
+                              OpenBao configure and seed scripts, example-k3s/ (an example cluster)
 examples/                     cluster.example-filled.yaml, a complete example
 ci/                           Render and validation scripts used by CI
 ```

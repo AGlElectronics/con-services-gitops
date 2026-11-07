@@ -10,6 +10,8 @@ storage:
   walSize: 10Gi
 # One login and one database per role. "events" is Rally's.
 roles: [den, keycloak]
+# Namespace of the CloudNativePG operator (allowed in by the network policy).
+operatorNamespace: cnpg-system
 backup:
   endpoint: https://s3.example.org
   region: example-region

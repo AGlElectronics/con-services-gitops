@@ -1,7 +1,7 @@
 {{- /*
 Not a Kubernetes object. Rendered only with --set global.seedPlan=true:
-bootstrap/scripts/openbao-seed.sh reads it to learn which OpenBao entries
-this cluster.yaml needs.
+bootstrap/scripts/openbao-configure.sh and openbao-seed.sh read it to learn
+how OpenBao is set up for this cluster.yaml and which entries it needs.
 */ -}}
 {{- if (.Values.global).seedPlan }}
 {{- $v := .Values }}
@@ -26,5 +26,14 @@ this cluster.yaml needs.
   "cloudflare" (eq $v.acme.dns01.provider "cloudflare")
   "githubArc" $v.arc.enabled
   "ghcr" $v.images.pullSecret.enabled
+  "kvPath" $v.openbao.kvPath
+  "authMount" $v.openbao.auth.mountPath
+  "authRole" $v.openbao.auth.role
+  "esoNamespace" $v.externalSecrets.namespace
+  "esoServiceAccount" $v.externalSecrets.serviceAccount
+  "caBundle" (dict
+    "kind" $v.openbao.caBundle.kind
+    "name" $v.openbao.caBundle.name
+    "namespace" ($v.openbao.caBundle.namespace | default $v.externalSecrets.namespace))
   | toJson }}
 {{- end }}

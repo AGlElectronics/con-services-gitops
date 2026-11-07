@@ -1,6 +1,10 @@
 {{- /*
 Cluster add-ons, sync waves -10 to -1. No finalizers: deleting an
 Application leaves the workload running.
+
+cert-manager, trust-manager, External Secrets Operator, OpenBao and the
+CloudNativePG operator are cluster prerequisites installed by the cluster
+operator (docs: deploy/prerequisites); this template only uses them.
 */ -}}
 {{- $v := .Values }}
 {{- if $v.loadBalancer.ciliumL2.enabled }}
@@ -26,75 +30,9 @@ spec:
     namespace: kube-system
   {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
 {{- end }}
----
-# cert-manager: certificates from Let's Encrypt and the internal CA.
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: cert-manager
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "-9"
-spec:
-  project: default
-  sources:
-    - repoURL: https://charts.jetstack.io
-      chart: cert-manager
-      targetRevision: v1.21.3
-      helm:
-        releaseName: cert-manager
-        valueFiles:
-          - $values/values/cert-manager.yaml
-        {{- $r := $v.certManager.resources }}
-        {{- $n := $v.certManager.replicas }}
-        {{- $cm := dict
-              "replicaCount" $n
-              "resources" $r.controller
-              "webhook" (dict "replicaCount" $n "resources" $r.webhook)
-              "cainjector" (dict "replicaCount" $n "resources" $r.cainjector)
-              "startupapicheck" (dict "resources" $r.startupapicheck)
-              "dns01RecursiveNameservers" $v.acme.recursiveNameservers }}
-        valuesObject:
-          {{- toYaml (mergeOverwrite $cm $v.certManager.values) | nindent 10 }}
-    {{- include "root.valuesRef" . | nindent 4 }}
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: cert-manager
-  {{- include "root.syncPolicy" (dict "options" (list "CreateNamespace=true" "ServerSideApply=true") "labels" (dict "pod-security.kubernetes.io/enforce" "restricted")) | nindent 2 }}
----
-# trust-manager: copies the internal CA bundle into Con Services namespaces.
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: trust-manager
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "-8"
-spec:
-  project: default
-  sources:
-    - repoURL: https://charts.jetstack.io
-      chart: trust-manager
-      targetRevision: v0.26.0
-      helm:
-        releaseName: trust-manager
-        valueFiles:
-          - $values/values/trust-manager.yaml
-        {{- $r := $v.trustManager.resources }}
-        {{- $tm := dict
-              "replicaCount" $v.trustManager.replicas
-              "resources" $r.controller
-              "defaultPackage" (dict "resources" $r.defaultPackage) }}
-        valuesObject:
-          {{- toYaml (mergeOverwrite $tm $v.trustManager.values) | nindent 10 }}
-    {{- include "root.valuesRef" . | nindent 4 }}
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: cert-manager
-  {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
 {{- if $v.storage.longhornSingle.enabled }}
 ---
-# StorageClass longhorn-single (one Longhorn replica) for PostgreSQL and OpenBao.
+# StorageClass longhorn-single (one Longhorn replica) for PostgreSQL.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -129,94 +67,7 @@ spec:
     namespace: cert-manager
   {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
 ---
-# External Secrets Operator: turns OpenBao entries into Kubernetes Secrets.
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: external-secrets
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "-6"
-spec:
-  project: default
-  sources:
-    - repoURL: https://charts.external-secrets.io
-      chart: external-secrets
-      targetRevision: 2.14.0
-      helm:
-        releaseName: external-secrets
-        valueFiles:
-          - $values/values/external-secrets.yaml
-        {{- $r := $v.externalSecrets.resources }}
-        {{- $n := $v.externalSecrets.replicas }}
-        {{- $es := dict
-              "replicaCount" $n
-              "resources" $r.controller
-              "webhook" (dict "replicaCount" $n "resources" $r.webhook)
-              "certController" (dict "replicaCount" $n "resources" $r.certController) }}
-        valuesObject:
-          {{- toYaml (mergeOverwrite $es $v.externalSecrets.values) | nindent 10 }}
-    {{- include "root.valuesRef" . | nindent 4 }}
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: external-secrets
-  ignoreDifferences:
-    - group: admissionregistration.k8s.io
-      kind: ValidatingWebhookConfiguration
-      jqPathExpressions:
-        - .webhooks[].clientConfig.caBundle
-    - group: apiextensions.k8s.io
-      kind: CustomResourceDefinition
-      jqPathExpressions:
-        - .spec.conversion.webhook.clientConfig.caBundle
-    - kind: Secret
-      name: external-secrets-webhook
-      jsonPointers:
-        - /data
-  {{- include "root.syncPolicy" (dict "options" (list "CreateNamespace=true" "ServerSideApply=true" "RespectIgnoreDifferences=true") "labels" (dict "app.kubernetes.io/part-of" "conservices" "pod-security.kubernetes.io/enforce" "restricted")) | nindent 2 }}
----
-# OpenBao: the secret store (Raft, TLS from the internal CA).
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: openbao
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "-5"
-spec:
-  project: default
-  sources:
-    - repoURL: https://openbao.github.io/openbao-helm
-      chart: openbao
-      targetRevision: 0.30.7
-      helm:
-        releaseName: openbao
-        valueFiles:
-          - $values/values/openbao.yaml
-        {{- $o := $v.openbao }}
-        {{- $class := include "root.selfReplicatingClass" (dict "root" $ "override" $o.storage.className) }}
-        {{- $data := dict "enabled" true "size" $o.storage.dataSize }}
-        {{- $audit := dict "enabled" true "size" $o.storage.auditSize }}
-        {{- if $class }}{{ $_ := set $data "storageClass" $class }}{{ $_ := set $audit "storageClass" $class }}{{ end }}
-        {{- $raft := include "root.openbaoRaftConfig" $o.replicas }}
-        {{- $bao := dict "server" (dict
-              "resources" $o.resources
-              "dataStorage" $data
-              "auditStorage" $audit
-              "ha" (dict "replicas" $o.replicas "raft" (dict "config" $raft))) }}
-        valuesObject:
-          {{- toYaml (mergeOverwrite $bao $o.values) | nindent 10 }}
-    {{- include "root.valuesRef" . | nindent 4 }}
-    {{- include "root.repoSourceItem" (dict "root" $ "path" "charts/openbao-extras") | nindent 4 }}
-      helm:
-        valuesObject:
-          domain: {{ $v.domain }}
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: openbao
-  {{- include "root.syncPolicy" (dict "options" (list "CreateNamespace=true" "ServerSideApply=true") "labels" (dict "app.kubernetes.io/part-of" "conservices" "pod-security.kubernetes.io/enforce" "baseline" "pod-security.kubernetes.io/warn" "restricted")) | nindent 2 }}
----
-# ClusterSecretStore "openbao": how External Secrets reads OpenBao.
+# ClusterSecretStore "openbao": how External Secrets reads the cluster's OpenBao.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -227,10 +78,14 @@ metadata:
 spec:
   project: default
   source:
-    {{- include "root.repoSource" (dict "root" $ "path" "components/cluster-secret-store") | nindent 4 }}
+    {{- include "root.repoSource" (dict "root" $ "path" "charts/secret-store") | nindent 4 }}
+    helm:
+      valuesObject:
+        openbao: {{ toJson $v.openbao }}
+        externalSecrets: {{ toJson $v.externalSecrets }}
   destination:
     server: https://kubernetes.default.svc
-    namespace: external-secrets
+    namespace: {{ $v.externalSecrets.namespace }}
   {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
 {{- if eq $v.oidcHairpin.mode "coredns-custom" }}
 ---

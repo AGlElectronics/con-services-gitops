@@ -80,7 +80,7 @@ syncPolicy:
       maxDuration: 5m
 {{- end }}
 
-{{/* StorageClass for PostgreSQL and OpenBao (they replicate themselves). Argument: dict root, override. */}}
+{{/* StorageClass for PostgreSQL (it replicates itself). Argument: dict root, override. */}}
 {{- define "root.selfReplicatingClass" -}}
 {{- if .override }}{{ .override }}
 {{- else if .root.Values.storage.longhornSingle.enabled }}longhorn-single
@@ -101,36 +101,6 @@ backupEndpoint: {{ $b.endpoint | default $s.endpoint | quote }}
 backupRegion: {{ $b.region | default $s.region | quote }}
 backupPathStyle: {{ (ternary $s.pathStyle $b.pathStyle (kindIs "invalid" $b.pathStyle)) | toString | quote }}
 backupFqdns: {{ toJson (uniq (concat $s.fqdns $b.fqdns)) }}
-{{- end }}
-
-{{/*
-OpenBao server configuration: TLS listener, Raft with one retry_join per
-replica, the audit log on its own volume. Argument: replica count.
-*/}}
-{{- define "root.openbaoRaftConfig" -}}
-ui = true
-listener "tcp" {
-  address         = "[::]:8200"
-  cluster_address = "[::]:8201"
-  tls_cert_file   = "/openbao/userconfig/openbao-tls/tls.crt"
-  tls_key_file    = "/openbao/userconfig/openbao-tls/tls.key"
-}
-storage "raft" {
-  path = "/openbao/data"
-{{- range $i := until (int .) }}
-  retry_join {
-    leader_api_addr     = "https://openbao-{{ $i }}.openbao-internal:8200"
-    leader_ca_cert_file = "/openbao/userconfig/openbao-tls/ca.crt"
-  }
-{{- end }}
-}
-service_registration "kubernetes" {}
-audit "file" "file" {
-  description = "Audit log on the audit volume"
-  options {
-    file_path = "/openbao/audit/audit.log"
-  }
-}
 {{- end }}
 
 {{/* Common labels of Con Services namespaces. Argument: dict tier, module. */}}

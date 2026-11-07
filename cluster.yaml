@@ -88,10 +88,21 @@ modules:
 # oidcHairpin:
 #   mode: coredns-custom
 
-# Longhorn: create longhorn-single and use it for PostgreSQL and OpenBao:
+# Longhorn: create longhorn-single and use it for PostgreSQL:
 # storage:
 #   longhornSingle:
 #     enabled: true
+
+# Your cluster's OpenBao and External Secrets Operator (prerequisites) are
+# not at the defaults (openbao-active.openbao.svc:8200, CA ConfigMap
+# openbao-ca, service account external-secrets/external-secrets):
+# openbao:
+#   server: https://openbao-active.openbao.svc:8200
+#   caBundle:
+#     name: openbao-ca
+# externalSecrets:
+#   namespace: external-secrets
+#   serviceAccount: external-secrets
 
 # Self-hosted GitHub Actions runners:
 # arc:

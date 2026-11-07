@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # Write every secret Con Services reads from OpenBao. Run after
-# openbao-init.sh, from the root of your copy of this repository.
+# openbao-configure.sh, from the root of your copy of this repository.
 #
+#   BAO_TOKEN=... bash bootstrap/scripts/openbao-seed.sh   # token that may write kv/*
+#   # or, with the init file of a fresh OpenBao (root token):
 #   INIT_FILE=$HOME/openbao-init.json bash bootstrap/scripts/openbao-seed.sh
-#   # or, with a token that may write kv/*:
-#   BAO_TOKEN=... bash bootstrap/scripts/openbao-seed.sh
+#   # or without either: the script asks for the token.
+#
+# Paths below use "kv"; with another openbao.kvPath in cluster.yaml the
+# entries go under that mount instead.
 #
 # It reads cluster.yaml (through the root chart, so "helm" is needed) and
 # only creates the entries the enabled modules and options need. Existing
@@ -85,7 +89,7 @@ while (($#)); do
     --modules=*) MODULES="${1#*=}" ;;
     --cluster-file) shift; CLUSTER_FILE="${1:-}" ;;
     --cluster-file=*) CLUSTER_FILE="${1#*=}" ;;
-    -h|--help) sed -n '2,65p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,69p' "$0"; exit 0 ;;
     *) die "unknown option: $1 (see --help)" ;;
   esac
   shift
@@ -94,8 +98,7 @@ done
 [[ -r "$CLUSTER_FILE" ]] || die "cannot read $CLUSTER_FILE (run from your copy of the repository or pass --cluster-file)"
 
 # --- What this cluster needs ----------------------------------------------------
-helm_args=(template root "$REPO_ROOT/charts/root" -f "$CLUSTER_FILE"
-           --set global.seedPlan=true --show-only templates/seed-plan.yaml)
+helm_args=()
 if [[ -n "$MODULES" ]]; then
   IFS=, read -r -a wanted <<<"$MODULES"
   for m in "${wanted[@]}"; do
@@ -109,9 +112,8 @@ if [[ -n "$MODULES" ]]; then
     fi
   done
 fi
-plan="$(helm "${helm_args[@]}" | sed -n '/^{/p')" \
-  || die "the root chart rejected $CLUSTER_FILE (fix the message above first)"
-[[ -n "$plan" ]] || die "could not read the seed plan from charts/root"
+plan="$(seed_plan "$CLUSTER_FILE" "${helm_args[@]}")"
+OPENBAO_KV="$(jq -r '.kvPath' <<<"$plan")"
 log "Modules: $(jq -r '.modules | join(", ")' <<<"$plan")"
 
 TOKEN="$(token_from_env_or_file)"
@@ -125,14 +127,14 @@ put_generated() {
   if kv_exists "$TOKEN" "$1"; then
     if [[ "$3" == "1" && "$ROTATE" == "1" ]]; then
       kv_put_json "$TOKEN" "$1" "$2"
-      log "kv/$1 rotated"
+      log "$OPENBAO_KV/$1 rotated"
     else
-      log "kv/$1 already exists, keeping it"
+      log "$OPENBAO_KV/$1 already exists, keeping it"
     fi
     return 0
   fi
   kv_put_json "$TOKEN" "$1" "$2"
-  log "kv/$1 written"
+  log "$OPENBAO_KV/$1 written"
 }
 
 one() { jq -n --arg k "$1" --arg v "$(gen_secret)" '{($k): $v}'; }
@@ -159,17 +161,17 @@ put_generated conservices/keycloak/clients \
      '{"den-keycloak": $a, "hr-provisioner": $b, "learn-provisioner": $c}')" 0
 
 # --- Values only you know ------------------------------------------------------------
-# ask <path> <fields> <description>: true if the caller should prompt for kv/<path>.
+# ask <path> <fields> <description>: true if the caller should prompt for <path>.
 ask() {
   if kv_exists "$TOKEN" "$1"; then
-    log "kv/$1 already exists, keeping it"
+    log "$OPENBAO_KV/$1 already exists, keeping it"
     return 1
   fi
   if [[ "$PROMPT" == "0" ]]; then
-    MISSING+=("kv/$1 ($2)")
+    MISSING+=("$OPENBAO_KV/$1 ($2)")
     return 1
   fi
-  log "kv/$1: $3"
+  log "$OPENBAO_KV/$1: $3"
   return 0
 }
 
@@ -182,9 +184,9 @@ while read -r path; do
       kv_put_json "$TOKEN" "conservices/$path" \
         "$(jq -n --arg a "$s3_access" --arg s "$s3_secret" '{access_key: $a, secret_key: $s}')"
       unset s3_secret
-      log "kv/conservices/$path written"
+      log "$OPENBAO_KV/conservices/$path written"
     else
-      MISSING+=("kv/conservices/$path (access_key, secret_key)")
+      MISSING+=("$OPENBAO_KV/conservices/$path (access_key, secret_key)")
     fi
   fi
 done < <(list s3)
@@ -202,9 +204,9 @@ if flag smtp && ask conservices/keycloak/smtp "host, port, from, username, passw
          --arg u "$smtp_user" --arg w "$smtp_pass" \
          '{host: $h, port: $p, from: $f, username: $u, password: $w}')"
     unset smtp_pass
-    log "kv/conservices/keycloak/smtp written"
+    log "$OPENBAO_KV/conservices/keycloak/smtp written"
   else
-    MISSING+=("kv/conservices/keycloak/smtp (host, port, from, username, password)")
+    MISSING+=("$OPENBAO_KV/conservices/keycloak/smtp (host, port, from, username, password)")
   fi
 fi
 
@@ -214,9 +216,9 @@ if flag cloudflare && ask infra/cloudflare "api-token" \
   if [[ -n "$cf" ]]; then
     kv_put_json "$TOKEN" infra/cloudflare "$(jq -n --arg t "$cf" '{"api-token": $t}')"
     unset cf
-    log "kv/infra/cloudflare written"
+    log "$OPENBAO_KV/infra/cloudflare written"
   else
-    MISSING+=("kv/infra/cloudflare (api-token)")
+    MISSING+=("$OPENBAO_KV/infra/cloudflare (api-token)")
   fi
 fi
 
@@ -230,9 +232,9 @@ if flag githubArc && ask infra/github-arc "github_app_id, github_app_installatio
     kv_put_json "$TOKEN" infra/github-arc "$(jq -n --arg a "$app_id" --arg i "$inst_id" \
       --rawfile k "$pem" \
       '{github_app_id: $a, github_app_installation_id: $i, github_app_private_key: $k}')"
-    log "kv/infra/github-arc written (you may now delete $pem)"
+    log "$OPENBAO_KV/infra/github-arc written (you may now delete $pem)"
   else
-    MISSING+=("kv/infra/github-arc (github_app_id, github_app_installation_id, github_app_private_key)")
+    MISSING+=("$OPENBAO_KV/infra/github-arc (github_app_id, github_app_installation_id, github_app_private_key)")
   fi
 fi
 
@@ -245,9 +247,9 @@ if flag ghcr && ask infra/ghcr "username, token" \
     kv_put_json "$TOKEN" infra/ghcr \
       "$(jq -n --arg u "$gh_user" --arg t "$gh_token" '{username: $u, token: $t}')"
     unset gh_token
-    log "kv/infra/ghcr written"
+    log "$OPENBAO_KV/infra/ghcr written"
   else
-    MISSING+=("kv/infra/ghcr (username, token)")
+    MISSING+=("$OPENBAO_KV/infra/ghcr (username, token)")
   fi
 fi
 

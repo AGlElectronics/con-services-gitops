@@ -27,6 +27,7 @@
       }
     },
     "replicas": {"type": "integer", "minimum": 1},
+    "k8sName": {"type": "string", "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"},
     "imageTag": {"type": "string", "not": {"const": "latest"}},
     "image": {"type": "string", "pattern": "^[^\\s]+:[^\\s:/]+$", "not": {"pattern": ":latest$"}},
     "module": {
@@ -75,8 +76,7 @@
             "provider": {"enum": ["cloudflare", "custom"]},
             "solvers": {"type": "array", "items": {"type": "object"}}
           }
-        },
-        "recursiveNameservers": {"type": "string"}
+        }
       }
     },
     "s3": {
@@ -210,7 +210,6 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "openbao": {"type": "boolean"},
         "longhorn": {"type": "boolean"},
         "hubble": {"type": "boolean"}
       }
@@ -227,96 +226,38 @@
         }
       }
     },
-    "certManager": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "replicas": {"$ref": "#/definitions/replicas"},
-        "resources": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "controller": {"$ref": "#/definitions/resources"},
-            "webhook": {"$ref": "#/definitions/resources"},
-            "cainjector": {"$ref": "#/definitions/resources"},
-            "startupapicheck": {"$ref": "#/definitions/resources"}
-          }
-        },
-        "values": {"$ref": "#/definitions/values"}
-      }
-    },
-    "trustManager": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "replicas": {"$ref": "#/definitions/replicas"},
-        "resources": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "controller": {"$ref": "#/definitions/resources"},
-            "defaultPackage": {"$ref": "#/definitions/resources"}
-          }
-        },
-        "values": {"$ref": "#/definitions/values"}
-      }
-    },
     "externalSecrets": {
       "type": "object",
       "additionalProperties": false,
+      "description": "Where the cluster's External Secrets Operator runs (a prerequisite).",
       "properties": {
-        "replicas": {"$ref": "#/definitions/replicas"},
-        "resources": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "controller": {"$ref": "#/definitions/resources"},
-            "webhook": {"$ref": "#/definitions/resources"},
-            "certController": {"$ref": "#/definitions/resources"}
-          }
-        },
-        "values": {"$ref": "#/definitions/values"}
+        "namespace": {"$ref": "#/definitions/k8sName"},
+        "serviceAccount": {"$ref": "#/definitions/k8sName"}
       }
     },
     "openbao": {
       "type": "object",
       "additionalProperties": false,
+      "description": "How External Secrets Operator reaches the cluster's OpenBao (a prerequisite).",
       "properties": {
-        "replicas": {"type": "integer", "enum": [1, 3, 5]},
-        "resources": {"$ref": "#/definitions/resources"},
-        "storage": {
+        "server": {"type": "string", "pattern": "^https://[^\\s/]+(:\\d+)?/?$"},
+        "kvPath": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$"},
+        "caBundle": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "className": {"type": "string"},
-            "dataSize": {"$ref": "#/definitions/quantity"},
-            "auditSize": {"$ref": "#/definitions/quantity"}
+            "kind": {"enum": ["ConfigMap", "Secret"]},
+            "name": {"type": "string"},
+            "key": {"$ref": "#/definitions/nonEmpty"},
+            "namespace": {"type": "string"}
           }
         },
-        "values": {"$ref": "#/definitions/values"}
-      }
-    },
-    "cnpg": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "operator": {
+        "auth": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "replicas": {"$ref": "#/definitions/replicas"},
-            "resources": {"$ref": "#/definitions/resources"},
-            "values": {"$ref": "#/definitions/values"}
-          }
-        },
-        "barmanCloud": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "replicas": {"$ref": "#/definitions/replicas"},
-            "resources": {"$ref": "#/definitions/resources"},
-            "sidecarResources": {"$ref": "#/definitions/resources"},
-            "values": {"$ref": "#/definitions/values"}
+            "mountPath": {"$ref": "#/definitions/nonEmpty"},
+            "role": {"$ref": "#/definitions/nonEmpty"}
           }
         }
       }
@@ -327,6 +268,7 @@
       "properties": {
         "instances": {"$ref": "#/definitions/replicas"},
         "resources": {"$ref": "#/definitions/resources"},
+        "operatorNamespace": {"$ref": "#/definitions/k8sName"},
         "storage": {
           "type": "object",
           "additionalProperties": false,
@@ -341,7 +283,8 @@
           "additionalProperties": false,
           "properties": {
             "schedule": {"type": "string"},
-            "retention": {"type": "string", "pattern": "^\\d+[dwm]$"}
+            "retention": {"type": "string", "pattern": "^\\d+[dwm]$"},
+            "sidecarResources": {"$ref": "#/definitions/resources"}
           }
         }
       }

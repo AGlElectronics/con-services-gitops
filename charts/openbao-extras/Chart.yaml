@@ -1,6 +1,0 @@
-apiVersion: v2
-name: openbao-extras
-description: >-
-  OpenBao's TLS certificate from the internal CA. Values come from the root chart (cluster.yaml).
-type: application
-version: 1.0.0

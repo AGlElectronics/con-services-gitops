@@ -28,7 +28,7 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: cnpg-system
+              kubernetes.io/metadata.name: {{ .Values.operatorNamespace }}
       ports:
         - { protocol: TCP, port: 8000 }
         - { protocol: TCP, port: 5432 }

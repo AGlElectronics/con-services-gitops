@@ -4,8 +4,8 @@ from cluster.yaml and applies it; from then on it manages itself and every
 other Application of this chart.
 The finalizer makes `kubectl delete application root` delete the child
 Applications too. The infrastructure Applications, platform-namespaces and
-postgres have no finalizer, so their workloads and data (OpenBao,
-PostgreSQL) keep running.
+postgres have no finalizer, so their workloads and data (PostgreSQL) keep
+running.
 */ -}}
 apiVersion: argoproj.io/v1alpha1
 kind: Application

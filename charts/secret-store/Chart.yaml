@@ -1,0 +1,6 @@
+apiVersion: v2
+name: secret-store
+description: >-
+  The ClusterSecretStore "openbao" through which External Secrets Operator reads the cluster's OpenBao. Values come from the root chart (cluster.yaml openbao.* and externalSecrets.*).
+type: application
+version: 1.0.0

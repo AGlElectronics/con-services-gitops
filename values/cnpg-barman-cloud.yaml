@@ -1,6 +1,0 @@
-# Barman Cloud plugin v0.15.1 (chart plugin-barman-cloud 0.8.1). Needs
-# cert-manager (it creates its own issuer). Replicas and resources come from
-# cluster.yaml (cnpg.barmanCloud.*). One replica is enough: WAL archiving
-# runs in the sidecar the plugin adds to every PostgreSQL pod, so a
-# restarting plugin pod does not stop archiving.
-{}

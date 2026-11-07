@@ -10,6 +10,32 @@ First version of the template.
 
 ### Changed
 
+- **BREAKING:** cert-manager, trust-manager, External Secrets Operator,
+  OpenBao, the CloudNativePG operator and its Barman Cloud plugin are now
+  cluster prerequisites that the cluster operator installs; the template
+  only uses them. Removed: their Applications, `values/*.yaml` files and
+  `charts/openbao-extras`; the `cluster.yaml` keys `certManager`,
+  `trustManager`, `cnpg`, `acme.recursiveNameservers`,
+  `adminRoutes.openbao` and the old `externalSecrets` and `openbao` blocks;
+  the `bao.<domain>` route; the namespace `cnpg-system` from
+  `platform-namespaces`; `bootstrap/scripts/openbao-init.sh` and
+  `openbao-unseal.sh`. `cnpg.barmanCloud.sidecarResources` moved to
+  `postgres.backup.sidecarResources`.
+  What to do on an existing installation, **before** pulling this change:
+  1. Stop Argo CD from deleting the operator namespace:
+     `kubectl annotate namespace cnpg-system argocd.argoproj.io/sync-options=Prune=false`.
+  2. Remove the moved keys from your `cluster.yaml` (the schema rejects them).
+  3. Keep the components running under your own management. The old
+     Applications have no deletion finalizer, so the workloads stay when
+     the template drops them; adopt them with Applications or Helm
+     releases of the same names (see the
+     [prerequisites](https://aglelectronics.github.io/con-services/deploy/prerequisites/)).
+  4. Keep the existing OpenBao CA: set `openbao.caBundle.name:
+     conservices-internal-ca` and keep the label
+     `app.kubernetes.io/part-of=conservices` on the namespace
+     `external-secrets`.
+  5. Unseal with your own copy of `openbao-unseal.sh` (or the OpenBao CLI)
+     from now on.
 - **BREAKING:** modules are now opt-in. Every `modules.<name>.enabled`
   defaults to `false`, and only Den is deployed until you enable modules.
   What to do: in `cluster.yaml`, under *Pick the modules to run*, set
@@ -24,6 +50,26 @@ First version of the template.
 
 ### Added
 
+- `cluster.yaml` settings for the cluster's OpenBao and External Secrets
+  Operator: `openbao.server`, `openbao.kvPath`, `openbao.caBundle`
+  (default: ConfigMap `openbao-ca`, key `ca.crt`, in the External Secrets
+  namespace), `openbao.auth.mountPath`, `openbao.auth.role`,
+  `externalSecrets.namespace` and `externalSecrets.serviceAccount`, and
+  `postgres.operatorNamespace` (default `cnpg-system`). The
+  `ClusterSecretStore` `openbao` is now the local chart `charts/secret-store`.
+- `bootstrap/scripts/openbao-configure.sh`: prepares an existing OpenBao
+  for Con Services (KV v2 engine, Kubernetes auth, policy
+  `conservices-external-secrets-read`, role for External Secrets Operator)
+  from the `cluster.yaml` settings above. `openbao-seed.sh` and
+  `openbao-configure.sh` ask for the token when neither `BAO_TOKEN` nor
+  `INIT_FILE` is set.
+- `bootstrap/install-root.sh` checks the prerequisites before it applies
+  the root Application: the cert-manager, trust-manager, External Secrets,
+  CloudNativePG and Barman Cloud CRDs, the External Secrets service account
+  and the OpenBao CA. `--skip-preflight` skips the check.
+- CI validates against the CRDs of the tested prerequisite versions
+  (cert-manager v1.21.3, trust-manager v0.26.0, External Secrets 2.14.0,
+  CloudNativePG chart 0.29.1, Barman Cloud plugin chart 0.8.1).
 - Every module Application sets `den.mode: required`: until a module is
   paired with Den, it shows *Waiting for Den* and its API answers
   `503 den_pairing_required`. There is no standalone option; the root chart
@@ -50,33 +96,27 @@ First version of the template.
 - Argo CD 3.6.1 (chart `argo-cd` 10.14.0) in HA mode with Redis HA, served
   on the internal Gateway with a certificate from the internal CA, and
   managing itself after the first install (`argocd.selfManage`).
-- cert-manager v1.21.3 and trust-manager v0.26.0, 2 replicas each with
-  PodDisruptionBudgets, and the Con Services internal CA
-  (`ClusterIssuer/conservices-internal-ca`, `Bundle/conservices-internal-ca`).
+- The Con Services internal CA (`ClusterIssuer/conservices-internal-ca`,
+  `Bundle/conservices-internal-ca`) on the cluster's cert-manager and
+  trust-manager.
 - Let's Encrypt ClusterIssuers `letsencrypt-staging` and `letsencrypt-prod`
   with DNS-01 (Cloudflare, or your own cert-manager solvers in
   `acme.dns01.solvers`), and a wildcard certificate for the domain.
 - Gateways `public` (internet-facing, HTTP to HTTPS redirect) and
-  `internal` (admin UIs: Argo CD, OpenBao, Keycloak admin console, and
-  optionally Longhorn and Hubble) in the namespace `conservices-gateway`.
+  `internal` (admin UIs: Argo CD, Keycloak admin console, and optionally
+  Longhorn and Hubble) in the namespace `conservices-gateway`.
 - Optional Cilium LB IPAM pool and L2 announcement policy
   (`loadBalancer.ciliumL2`), optional CoreDNS rewrite so pods reach
   Keycloak's public address inside the cluster (`oidcHairpin`), and an
   optional `longhorn-single` StorageClass (`storage.longhornSingle`).
-- OpenBao 2.7.2 (chart 0.30.7) with Raft storage, 3 replicas and TLS from
-  the internal CA; External Secrets Operator 2.14.0 with the
-  `ClusterSecretStore` `openbao`.
-- Scripts to initialise, unseal and fill OpenBao:
-  `bootstrap/scripts/openbao-init.sh`, `openbao-unseal.sh` and
-  `openbao-seed.sh`. The seed script reads `cluster.yaml`, creates only the
-  entries the enabled modules and options need, generates the random
-  values, asks for the provider credentials, never prints a value, and
-  rotates only safe entries with `--rotate`.
-- Platform namespaces `cnpg-system`, `conservices-data` and
-  `conservices-identity` with default-deny NetworkPolicies and Pod Security
-  labels.
-- CloudNativePG operator 1.30.1 (chart `cloudnative-pg` 0.29.1, 2 replicas)
-  and the Barman Cloud plugin v0.15.1 (chart `plugin-barman-cloud` 0.8.1).
+- The `ClusterSecretStore` `openbao` through which External Secrets
+  Operator reads the cluster's OpenBao.
+- `bootstrap/scripts/openbao-seed.sh` fills OpenBao: it reads
+  `cluster.yaml`, creates only the entries the enabled modules and options
+  need, generates the random values, asks for the provider credentials,
+  never prints a value, and rotates only safe entries with `--rotate`.
+- Platform namespaces `conservices-data` and `conservices-identity` with
+  default-deny NetworkPolicies and Pod Security labels.
 - PostgreSQL 16.15 cluster `conservices-pg` (`charts/postgres`): 3
   instances on different nodes, quorum synchronous replication, TLS-only
   `pg_hba` with one login per database, roles and databases for exactly
@@ -99,7 +139,8 @@ First version of the template.
   Runner Controller 0.15.1 with rootless BuildKit and a test database as
   sidecars, scale to zero, egress on port 443 only.
 - CPU and memory requests and limits on every container, set in
-  `cluster.yaml`; the defaults total about 4.2 CPU and 11 GiB of requests.
+  `cluster.yaml`; with the example's five modules the defaults total about
+  3 CPU and 8.6 GiB of requests, not counting the prerequisites.
 - Applications that hold data (`platform-namespaces`, `postgres`) have no
   deletion finalizer, and databases use `databaseReclaimPolicy: retain`, so
   deleting an Application or disabling a module never deletes data.

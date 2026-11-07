@@ -2,11 +2,11 @@
 Two Gateways, each with its own LoadBalancer IP.
   public:   the internet-facing entry point; forward ports 80 and 443 to it.
             Routes from namespaces labelled app.kubernetes.io/part-of=conservices.
-  internal: never exposed to the internet. Admin UIs (Argo CD, OpenBao,
-            Keycloak admin console, optionally Longhorn and Hubble); only
-            routes from the namespaces listed below attach.
+  internal: never exposed to the internet. Admin UIs (Argo CD, Keycloak
+            admin console, optionally Longhorn and Hubble); only routes from
+            the namespaces listed below attach.
 */ -}}
-{{- $internalNamespaces := list "conservices-gateway" "openbao" }}
+{{- $internalNamespaces := list "conservices-gateway" }}
 {{- if .Values.argocd }}{{ $internalNamespaces = append $internalNamespaces "argocd" }}{{ end }}
 {{- if .Values.adminRoutes.longhorn }}{{ $internalNamespaces = append $internalNamespaces "longhorn-system" }}{{ end }}
 {{- if .Values.adminRoutes.hubble }}{{ $internalNamespaces = append $internalNamespaces "kube-system" }}{{ end }}
