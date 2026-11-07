@@ -1,0 +1,11 @@
+# Internal TLS: one private certificate authority for traffic inside the
+# cluster. Needs cert-manager and trust-manager installed first.
+# Source: deploy/kubernetes/base/pki/ in AGlElectronics/con-services (copied,
+# see the note in issuers.yaml).
+# Documentation: https://aglelectronics.github.io/con-services/operations/internal-tls/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - issuers.yaml
+  - bundle.yaml

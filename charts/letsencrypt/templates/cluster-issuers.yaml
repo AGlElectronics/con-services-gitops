@@ -1,0 +1,58 @@
+# Let's Encrypt with the DNS-01 challenge. DNS-01 works for wildcard
+# certificates and needs no inbound port during issuance.
+#
+# letsencrypt-staging: untrusted test certificates, generous rate limits.
+#   Use it first (acme.issuer in cluster.yaml).
+# letsencrypt-prod: trusted certificates, strict rate limits (5 duplicate
+#   certificates per week).
+{{- define "letsencrypt.solvers" -}}
+{{- if eq .Values.provider "cloudflare" }}
+- dns01:
+    cloudflare:
+      apiTokenSecretRef:
+        name: cloudflare-api-token
+        key: api-token
+{{- else }}
+{{- toYaml .Values.solvers }}
+{{- end }}
+{{- end }}
+{{- range $name, $server := dict "letsencrypt-staging" "https://acme-staging-v02.api.letsencrypt.org/directory" "letsencrypt-prod" "https://acme-v02.api.letsencrypt.org/directory" }}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ $name }}
+spec:
+  acme:
+    server: {{ $server }}
+    email: {{ $.Values.email | quote }}
+    privateKeySecretRef:
+      name: {{ $name }}-account-key
+    solvers:
+      {{- include "letsencrypt.solvers" $ | nindent 6 }}
+{{- end }}
+{{- if eq .Values.provider "cloudflare" }}
+---
+# The Cloudflare API token cert-manager uses to create the DNS-01 TXT
+# records, from OpenBao kv/infra/cloudflare (property api-token), written by
+# bootstrap/scripts/openbao-seed.sh. Scopes: Zone:DNS:Edit and
+# Zone:Zone:Read, for your zone only.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: cloudflare-api-token
+  namespace: cert-manager
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: openbao
+  target:
+    name: cloudflare-api-token
+    creationPolicy: Owner
+  data:
+    - secretKey: api-token
+      remoteRef:
+        key: infra/cloudflare
+        property: api-token
+{{- end }}

@@ -1,0 +1,72 @@
+{{- if eq .Values.app "hr" }}
+# Secrets of HR in conservices-hr, built by External Secrets from OpenBao
+# (ClusterSecretStore "openbao", KV v2 at "kv"). Nothing secret is in Git.
+# Fill the OpenBao entries with bootstrap/scripts/openbao-seed.sh.
+# Inventory: https://aglelectronics.github.io/con-services/operations/secrets/
+#
+# DATABASE_URL: the role's password comes from the same OpenBao entry that
+# CloudNativePG uses for the role (charts/postgres), so they always
+# agree. Passwords are hex, so they need no escaping inside the URL.
+#
+# The service tokens and hooks of Learn, Wiki and Tasks are only included
+# when those modules are enabled.
+#
+# Optional keys (SMTP_PASSWORD, TELEGRAM_BOT_TOKEN) are not included: add a
+# data entry and a template line here once the OpenBao entry exists.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: hr-secrets
+  namespace: conservices-hr
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: openbao
+  target:
+    name: hr-secrets
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        DATABASE_URL: "postgres://hr:{{`{{ .dbPassword }}`}}@conservices-pg-rw.conservices-data.svc.cluster.local:5432/hr?sslmode=verify-full&sslrootcert=/etc/conservices-internal-ca/ca.crt"
+        KEYCLOAK_CLIENT_SECRET: "{{`{{ .keycloakClientSecret }}`}}"
+        {{- if has "learn" .Values.enabledModules }}
+        LEARN_SERVICE_TOKEN: "{{`{{ .learnToken }}`}}"
+        {{- end }}
+        {{- if has "wiki" .Values.enabledModules }}
+        OFFBOARD_HOOKS: "https://wiki-backend.conservices-wiki.svc.cluster.local:8080/api/internal/offboarded|{{`{{ .wikiToken }}`}}"
+        {{- end }}
+        {{- if has "tasks" .Values.enabledModules }}
+        DEPARTMENT_HOOKS: "https://tasks-backend.conservices-tasks.svc.cluster.local:8080/api/internal/departments|{{`{{ .tasksToken }}`}}"
+        {{- end }}
+  data:
+    - secretKey: dbPassword
+      remoteRef:
+        key: conservices/postgres/roles/hr
+        property: password
+    - secretKey: keycloakClientSecret
+      remoteRef:
+        key: conservices/keycloak/clients
+        property: hr-provisioner
+    {{- if has "learn" .Values.enabledModules }}
+    - secretKey: learnToken
+      remoteRef:
+        key: conservices/service-tokens/learn
+        property: token
+    {{- end }}
+    {{- if has "wiki" .Values.enabledModules }}
+    - secretKey: wikiToken
+      remoteRef:
+        key: conservices/service-tokens/wiki
+        property: token
+    {{- end }}
+    {{- if has "tasks" .Values.enabledModules }}
+    - secretKey: tasksToken
+      remoteRef:
+        key: conservices/service-tokens/tasks
+        property: token
+    {{- end }}
+{{- end }}

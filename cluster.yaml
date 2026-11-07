@@ -1,0 +1,91 @@
+# Settings of YOUR Con Services cluster. The only file you must edit.
+#
+# 1. Replace every "change-me" below. `grep -n change-me cluster.yaml`
+#    printing nothing means you are done.
+# 2. Commit and push, then run bootstrap/install-root.sh.
+#
+# Every other setting has a production default in charts/root/values.yaml.
+# To change one, copy its key here (same nesting) and set your value; this
+# file wins. The optional section at the end shows the common ones.
+# Reference: https://aglelectronics.github.io/con-services/deploy/argocd/#clusteryaml-reference
+
+# --- Required ---------------------------------------------------------------
+
+# Your domain, e.g. example.org. Apps live on <app>.<domain>, Rally on
+# events.<domain>, sign-in on auth.<domain>.
+domain: change-me
+
+git:
+  # HTTPS URL of your copy of this repository,
+  # e.g. https://github.com/your-org/con-services-gitops.git
+  repoURL: change-me
+
+acme:
+  # Let's Encrypt sends certificate expiry warnings to this address.
+  email: change-me
+
+s3:
+  # Your managed S3-compatible object storage, e.g. https://s3.example-provider.com
+  endpoint: change-me
+  # The provider's region, e.g. eu-central-1.
+  region: change-me
+  # Buckets: <bucketPrefix>-conservices-<app>, <bucketPrefix>-pg-backups,
+  # <bucketPrefix>-den-backups. Lowercase letters, digits and dashes.
+  bucketPrefix: change-me
+  # DNS name(s) of the endpoint for the egress network policies,
+  # e.g. ["s3.example-provider.com", "*.s3.example-provider.com"].
+  fqdns:
+    - change-me
+
+den:
+  # age public key for Den's encrypted backups: run `age-keygen -o den-backup.key`
+  # and copy the "Public key: age1..." line. Keep den-backup.key offline.
+  backupAgeRecipients: change-me
+
+# --- Optional (uncomment to change a default) -------------------------------
+
+# Follow another branch or tag of your copy:
+# git:
+#   targetRevision: main
+
+# Switch to trusted certificates once the staging certificate works:
+# acme:
+#   issuer: letsencrypt-prod
+
+# Backups at another region or provider (recommended):
+# s3:
+#   backup:
+#     endpoint: https://s3.other-region.example-provider.com
+#     region: other-region
+#     fqdns: ["s3.other-region.example-provider.com"]
+
+# Turn modules off (on by default: stash hr rally finance learn wiki desk tasks):
+# modules:
+#   finance:
+#     enabled: false
+
+# Let this template hand out the Gateway IPs with Cilium LB IPAM and L2
+# announcements (needs Cilium's l2announcements.enabled):
+# loadBalancer:
+#   ciliumL2:
+#     enabled: true
+#     blocks: ["192.0.2.240/29"]
+# gateway:
+#   public:
+#     loadBalancerIP: 192.0.2.240
+#   internal:
+#     loadBalancerIP: 192.0.2.241
+
+# k3s or AKS: let CoreDNS answer auth.<domain> with the in-cluster Keycloak:
+# oidcHairpin:
+#   mode: coredns-custom
+
+# Longhorn: create longhorn-single and use it for PostgreSQL and OpenBao:
+# storage:
+#   longhornSingle:
+#     enabled: true
+
+# Self-hosted GitHub Actions runners:
+# arc:
+#   enabled: true
+#   githubConfigUrl: https://github.com/your-org

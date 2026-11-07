@@ -1,0 +1,4 @@
+# Output of ci/render.py and ci/crd-schemas.py
+build/
+# Never commit OpenBao init output (unseal keys, root token)
+openbao-init.json

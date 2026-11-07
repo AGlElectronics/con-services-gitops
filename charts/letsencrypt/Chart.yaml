@@ -1,0 +1,6 @@
+apiVersion: v2
+name: letsencrypt
+description: >-
+  Let's Encrypt ClusterIssuers (DNS-01) and the Cloudflare API token ExternalSecret. Values come from the root chart (cluster.yaml).
+type: application
+version: 1.0.0

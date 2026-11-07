@@ -1,0 +1,23 @@
+# Set by the root chart from cluster.yaml (postgres.*, s3.*, modules).
+instances: 3
+resources:
+  requests: { cpu: 250m, memory: 1Gi }
+  limits: { cpu: "2", memory: 1Gi }
+storage:
+  # Empty: the cluster default StorageClass.
+  className: ""
+  size: 20Gi
+  walSize: 10Gi
+# One login and one database per role. "events" is Rally's.
+roles: [den, keycloak]
+backup:
+  endpoint: https://s3.example.org
+  region: example-region
+  bucket: example-pg-backups
+  # DNS names of the backup endpoint (Cilium toFQDNs). "*.host" = pattern.
+  fqdns: [s3.example.org]
+  schedule: "0 15 2 * * *"
+  retention: 30d
+  sidecarResources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 512Mi }

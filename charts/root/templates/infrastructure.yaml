@@ -1,0 +1,352 @@
+{{- /*
+Cluster add-ons, sync waves -10 to -1. No finalizers: deleting an
+Application leaves the workload running.
+*/ -}}
+{{- $v := .Values }}
+{{- if $v.loadBalancer.ciliumL2.enabled }}
+---
+# LoadBalancer IP pool and L2 announcements for Cilium LB IPAM.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cilium-lb
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: default
+  source:
+    {{- include "root.repoSource" (dict "root" $ "path" "charts/cilium-lb") | nindent 4 }}
+    helm:
+      valuesObject:
+        blocks: {{ toJson $v.loadBalancer.ciliumL2.blocks }}
+        interfaces: {{ toJson $v.loadBalancer.ciliumL2.interfaces }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
+{{- end }}
+---
+# cert-manager: certificates from Let's Encrypt and the internal CA.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-9"
+spec:
+  project: default
+  sources:
+    - repoURL: https://charts.jetstack.io
+      chart: cert-manager
+      targetRevision: v1.21.3
+      helm:
+        releaseName: cert-manager
+        valueFiles:
+          - $values/values/cert-manager.yaml
+        {{- $r := $v.certManager.resources }}
+        {{- $n := $v.certManager.replicas }}
+        {{- $cm := dict
+              "replicaCount" $n
+              "resources" $r.controller
+              "webhook" (dict "replicaCount" $n "resources" $r.webhook)
+              "cainjector" (dict "replicaCount" $n "resources" $r.cainjector)
+              "startupapicheck" (dict "resources" $r.startupapicheck)
+              "dns01RecursiveNameservers" $v.acme.recursiveNameservers }}
+        valuesObject:
+          {{- toYaml (mergeOverwrite $cm $v.certManager.values) | nindent 10 }}
+    {{- include "root.valuesRef" . | nindent 4 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  {{- include "root.syncPolicy" (dict "options" (list "CreateNamespace=true" "ServerSideApply=true") "labels" (dict "pod-security.kubernetes.io/enforce" "restricted")) | nindent 2 }}
+---
+# trust-manager: copies the internal CA bundle into Con Services namespaces.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: trust-manager
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-8"
+spec:
+  project: default
+  sources:
+    - repoURL: https://charts.jetstack.io
+      chart: trust-manager
+      targetRevision: v0.26.0
+      helm:
+        releaseName: trust-manager
+        valueFiles:
+          - $values/values/trust-manager.yaml
+        {{- $r := $v.trustManager.resources }}
+        {{- $tm := dict
+              "replicaCount" $v.trustManager.replicas
+              "resources" $r.controller
+              "defaultPackage" (dict "resources" $r.defaultPackage) }}
+        valuesObject:
+          {{- toYaml (mergeOverwrite $tm $v.trustManager.values) | nindent 10 }}
+    {{- include "root.valuesRef" . | nindent 4 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
+{{- if $v.storage.longhornSingle.enabled }}
+---
+# StorageClass longhorn-single (one Longhorn replica) for PostgreSQL and OpenBao.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: longhorn-storage
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-8"
+spec:
+  project: default
+  source:
+    {{- include "root.repoSource" (dict "root" $ "path" "charts/longhorn-storage") | nindent 4 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: longhorn-system
+  {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
+{{- end }}
+---
+# The internal CA (ClusterIssuer conservices-internal-ca) and its bundle.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pki
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-7"
+spec:
+  project: default
+  source:
+    {{- include "root.repoSource" (dict "root" $ "path" "components/pki") | nindent 4 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
+---
+# External Secrets Operator: turns OpenBao entries into Kubernetes Secrets.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-secrets
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-6"
+spec:
+  project: default
+  sources:
+    - repoURL: https://charts.external-secrets.io
+      chart: external-secrets
+      targetRevision: 2.14.0
+      helm:
+        releaseName: external-secrets
+        valueFiles:
+          - $values/values/external-secrets.yaml
+        {{- $r := $v.externalSecrets.resources }}
+        {{- $n := $v.externalSecrets.replicas }}
+        {{- $es := dict
+              "replicaCount" $n
+              "resources" $r.controller
+              "webhook" (dict "replicaCount" $n "resources" $r.webhook)
+              "certController" (dict "replicaCount" $n "resources" $r.certController) }}
+        valuesObject:
+          {{- toYaml (mergeOverwrite $es $v.externalSecrets.values) | nindent 10 }}
+    {{- include "root.valuesRef" . | nindent 4 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jqPathExpressions:
+        - .spec.conversion.webhook.clientConfig.caBundle
+    - kind: Secret
+      name: external-secrets-webhook
+      jsonPointers:
+        - /data
+  {{- include "root.syncPolicy" (dict "options" (list "CreateNamespace=true" "ServerSideApply=true" "RespectIgnoreDifferences=true") "labels" (dict "app.kubernetes.io/part-of" "conservices" "pod-security.kubernetes.io/enforce" "restricted")) | nindent 2 }}
+---
+# OpenBao: the secret store (Raft, TLS from the internal CA).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openbao
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  project: default
+  sources:
+    - repoURL: https://openbao.github.io/openbao-helm
+      chart: openbao
+      targetRevision: 0.30.7
+      helm:
+        releaseName: openbao
+        valueFiles:
+          - $values/values/openbao.yaml
+        {{- $o := $v.openbao }}
+        {{- $class := include "root.selfReplicatingClass" (dict "root" $ "override" $o.storage.className) }}
+        {{- $data := dict "enabled" true "size" $o.storage.dataSize }}
+        {{- $audit := dict "enabled" true "size" $o.storage.auditSize }}
+        {{- if $class }}{{ $_ := set $data "storageClass" $class }}{{ $_ := set $audit "storageClass" $class }}{{ end }}
+        {{- $raft := include "root.openbaoRaftConfig" $o.replicas }}
+        {{- $bao := dict "server" (dict
+              "resources" $o.resources
+              "dataStorage" $data
+              "auditStorage" $audit
+              "ha" (dict "replicas" $o.replicas "raft" (dict "config" $raft))) }}
+        valuesObject:
+          {{- toYaml (mergeOverwrite $bao $o.values) | nindent 10 }}
+    {{- include "root.valuesRef" . | nindent 4 }}
+    {{- include "root.repoSourceItem" (dict "root" $ "path" "charts/openbao-extras") | nindent 4 }}
+      helm:
+        valuesObject:
+          domain: {{ $v.domain }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openbao
+  {{- include "root.syncPolicy" (dict "options" (list "CreateNamespace=true" "ServerSideApply=true") "labels" (dict "app.kubernetes.io/part-of" "conservices" "pod-security.kubernetes.io/enforce" "baseline" "pod-security.kubernetes.io/warn" "restricted")) | nindent 2 }}
+---
+# ClusterSecretStore "openbao": how External Secrets reads OpenBao.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cluster-secret-store
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+spec:
+  project: default
+  source:
+    {{- include "root.repoSource" (dict "root" $ "path" "components/cluster-secret-store") | nindent 4 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
+{{- if eq $v.oidcHairpin.mode "coredns-custom" }}
+---
+# CoreDNS answers auth.<domain> with the in-cluster Keycloak Service.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: oidc-hairpin
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+spec:
+  project: default
+  source:
+    {{- include "root.repoSource" (dict "root" $ "path" "charts/oidc-hairpin") | nindent 4 }}
+    helm:
+      valuesObject:
+        domain: {{ $v.domain }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
+{{- end }}
+---
+# Let's Encrypt ClusterIssuers (DNS-01).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: letsencrypt
+  namespace: argocd
+  labels:
+    conservices.io/dns01-provider: {{ $v.acme.dns01.provider }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
+spec:
+  project: default
+  source:
+    {{- include "root.repoSource" (dict "root" $ "path" "charts/letsencrypt") | nindent 4 }}
+    helm:
+      valuesObject:
+        email: {{ $v.acme.email | quote }}
+        provider: {{ $v.acme.dns01.provider }}
+        solvers: {{ toJson $v.acme.dns01.solvers }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
+---
+# The public and internal Gateways, the wildcard certificate, admin routes.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: default
+  source:
+    {{- include "root.repoSource" (dict "root" $ "path" "charts/gateway") | nindent 4 }}
+    helm:
+      valuesObject:
+        domain: {{ $v.domain }}
+        className: {{ $v.gateway.className }}
+        issuer: {{ $v.acme.issuer }}
+        public: {{ toJson $v.gateway.public }}
+        internal: {{ toJson $v.gateway.internal }}
+        adminRoutes: {{ toJson $v.adminRoutes }}
+        argocd: {{ $v.argocd.selfManage }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: conservices-gateway
+  {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
+{{- if $v.argocd.selfManage }}
+---
+# Argo CD manages its own installation (same values as bootstrap/argocd/).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: default
+  sources:
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-cd
+      targetRevision: 10.14.0
+      helm:
+        releaseName: argocd
+        valueFiles:
+          - $values/bootstrap/argocd/values.yaml
+        {{- $host := printf "argocd.%s" $v.domain }}
+        {{- $ca := dict "group" "" "kind" "ConfigMap" "name" "conservices-internal-ca" }}
+        {{- $argo := dict
+              "global" (dict "domain" $host)
+              "server" (dict
+                "certificate" (dict
+                  "enabled" true
+                  "additionalHosts" (list "argocd-server" "argocd-server.argocd.svc" "argocd-server.argocd.svc.cluster.local")
+                  "issuer" (dict "group" "cert-manager.io" "kind" "ClusterIssuer" "name" "conservices-internal-ca")
+                  "privateKey" (dict "algorithm" "ECDSA" "size" 256 "rotationPolicy" "Always"))
+                "httproute" (dict
+                  "enabled" true
+                  "parentRefs" (list (dict "name" "internal" "namespace" "conservices-gateway" "sectionName" "https"))
+                  "hostnames" (list $host))
+                "backendTLSPolicy" (dict
+                  "enabled" true
+                  "targetRefs" (list (dict "group" "" "kind" "Service" "name" "argocd-server"))
+                  "validation" (dict "hostname" "argocd-server.argocd.svc" "caCertificateRefs" (list $ca)))) }}
+        valuesObject:
+          {{- toYaml (mergeOverwrite $argo $v.argocd.values) | nindent 10 }}
+    {{- include "root.valuesRef" . | nindent 4 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  {{- include "root.syncPolicy" (dict "options" (list "CreateNamespace=true" "ServerSideApply=true") "labels" (dict "app.kubernetes.io/part-of" "conservices" "pod-security.kubernetes.io/enforce" "baseline" "pod-security.kubernetes.io/warn" "restricted")) | nindent 2 }}
+{{- end }}

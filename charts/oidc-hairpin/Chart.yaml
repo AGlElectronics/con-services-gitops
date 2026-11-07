@@ -1,0 +1,6 @@
+apiVersion: v2
+name: oidc-hairpin
+description: >-
+  CoreDNS rewrite (ConfigMap coredns-custom) so pods reach Keycloak on its public name inside the cluster. Values come from the root chart (cluster.yaml).
+type: application
+version: 1.0.0

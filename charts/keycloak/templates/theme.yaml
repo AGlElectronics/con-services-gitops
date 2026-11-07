@@ -1,0 +1,14 @@
+# The conservices login and email theme, copied from the main repository
+# (infra/keycloak/themes/conservices) into files/theme/. Mounted by
+# keycloak.yaml. After a theme change, restart Keycloak
+# (deploy/identity.md#login-theme).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-theme
+  namespace: conservices-identity
+data:
+  {{- range $path, $_ := .Files.Glob "files/theme/*" }}
+  {{ base $path }}: |-
+    {{- $.Files.Get $path | nindent 4 }}
+  {{- end }}

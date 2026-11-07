@@ -1,0 +1,11 @@
+apiVersion: v2
+name: root
+description: >-
+  Renders every Argo CD Application of a Con Services cluster from cluster.yaml
+  (the "app of apps"). Apply it once with bootstrap/install-root.sh; Argo CD
+  then keeps it in sync with your repository.
+type: application
+version: 1.0.0
+home: https://aglelectronics.github.io/con-services/deploy/
+sources:
+  - https://github.com/AGlElectronics/con-services-gitops

@@ -1,0 +1,137 @@
+# Keycloak for Con Services, run by the Keycloak Operator (26.8.2, which
+# also picks the Keycloak image: quay.io/keycloak/keycloak:26.8.2).
+# Docs: https://aglelectronics.github.io/con-services/deploy/identity/
+#
+# HA: 2 instances on different nodes. Sessions and caches are shared through
+# Infinispan; the instances find each other through the database (JDBC_PING,
+# the default cache stack since Keycloak 26.1) and talk on 7800/57800.
+#
+# Hostnames, instances and resources come from cluster.yaml (domain,
+# keycloak.*).
+apiVersion: k8s.keycloak.org/v2beta1
+kind: Keycloak
+metadata:
+  name: keycloak
+  namespace: conservices-identity
+spec:
+  instances: {{ .Values.instances }}
+
+  db:
+    vendor: postgres
+    # verify-full: check the server certificate (internal CA) and its name.
+    url: jdbc:postgresql://conservices-pg-rw.conservices-data.svc.cluster.local:5432/keycloak?sslmode=verify-full&sslrootcert=/etc/conservices-internal-ca/ca.crt
+    usernameSecret:
+      name: keycloak-db
+      key: username
+    passwordSecret:
+      name: keycloak-db
+      key: password
+    poolMinSize: 5
+    poolInitialSize: 5
+    poolMaxSize: 30
+
+  http:
+    httpEnabled: false
+    httpsPort: 8443
+    tlsSecret: keycloak-tls
+    # Service "keycloak" on 8443: the in-cluster admin URL the charts expect
+    # (https://keycloak.conservices-identity.svc.cluster.local:8443).
+    serviceName: keycloak
+
+  hostname:
+    hostname: https://auth.{{ .Values.domain }}
+    admin: https://auth-admin.{{ .Values.domain }}
+    strict: true
+    # Backends may call Keycloak on its in-cluster name.
+    backchannelDynamic: true
+
+  # The Gateway terminates public TLS and sets X-Forwarded-*.
+  proxy:
+    headers: xforwarded
+
+  # Exposed through the Gateway (HTTPRoutes), not an Ingress.
+  ingress:
+    enabled: false
+
+  # Our own policies (networkpolicies.yaml) replace the operator's.
+  networkPolicy:
+    enabled: false
+
+  # Temporary admin of the master realm, used once. Replace it with a real
+  # admin and delete it: deploy/identity.md#first-admin-login.
+  bootstrapAdmin:
+    user:
+      secret: keycloak-bootstrap-admin
+
+  additionalOptions:
+    - name: metrics-enabled
+      value: "true"
+    - name: log-console-output
+      value: json
+
+  resources:
+    {{- toYaml .Values.resources | nindent 4 }}
+
+  scheduling:
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app: keycloak
+                  app.kubernetes.io/instance: keycloak
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: keycloak
+            app.kubernetes.io/instance: keycloak
+
+  unsupported:
+    podTemplate:
+      metadata:
+        labels:
+          app.kubernetes.io/part-of: conservices
+      spec:
+        securityContext:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        containers:
+          - securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop: ["ALL"]
+            volumeMounts:
+              # sslrootcert of the JDBC URL.
+              - name: internal-ca
+                mountPath: /etc/conservices-internal-ca
+                readOnly: true
+              - name: theme
+                mountPath: /opt/keycloak/themes/conservices
+                readOnly: true
+        volumes:
+          - name: internal-ca
+            configMap:
+              name: conservices-internal-ca
+          - name: theme
+            configMap:
+              name: keycloak-theme
+              items:
+                - key: login-theme.properties
+                  path: login/theme.properties
+                - key: login-footer.ftl
+                  path: login/footer.ftl
+                - key: login-conservices.css
+                  path: login/resources/css/conservices.css
+                - key: login-brand.js
+                  path: login/resources/js/brand.js
+                - key: email-theme.properties
+                  path: email/theme.properties
+                - key: email-messages_en.properties
+                  path: email/messages/messages_en.properties

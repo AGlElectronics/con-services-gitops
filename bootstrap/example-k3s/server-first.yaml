@@ -1,0 +1,57 @@
+# k3s configuration for the FIRST server node (node-1, 10.0.0.11).
+# Example only: Con Services runs on any Kubernetes cluster that meets the
+# prerequisites. Copy to /etc/rancher/k3s/config.yaml on that node BEFORE
+# installing k3s:
+#
+#   sudo install -d -m 755 /etc/rancher/k3s
+#   sudo install -m 600 server-first.yaml /etc/rancher/k3s/config.yaml
+#   curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.37.2+k3s1 sh -s - server
+#
+# Guide: https://aglelectronics.github.io/con-services/deploy/cluster/
+#
+# Replace the addresses with yours. The cluster join token is read from a
+# file so it never appears in this config or in the shell history; see the
+# guide for how to create /etc/rancher/k3s/cluster-token.
+
+# Start a new embedded etcd cluster. Only on the first server.
+cluster-init: true
+token-file: /etc/rancher/k3s/cluster-token
+
+# Names and addresses clients may use to reach the API server. Add every
+# server's IP and, if you have one, the virtual IP or DNS name of the API.
+tls-san:
+  - k8s.example.org        # DNS name of the API (optional)
+  - 10.0.0.11              # node-1 (this node)
+  - 10.0.0.12              # node-2
+  - 10.0.0.13              # node-3
+
+# Pod and Service networks (k3s defaults, written out so Cilium can match).
+cluster-cidr: 10.42.0.0/16
+service-cidr: 10.43.0.0/16
+
+# Cilium replaces flannel, kube-proxy and the k3s network policy controller.
+flannel-backend: none
+disable-network-policy: true
+disable-kube-proxy: true
+
+# Cilium Gateway API replaces Traefik, Cilium LB IPAM replaces ServiceLB,
+# Longhorn replaces local-path storage. Do NOT disable "gateway-api-crd":
+# that k3s add-on installs the Gateway API CRDs (v1.6.3) Cilium needs.
+disable:
+  - traefik
+  - servicelb
+  - local-storage
+
+# Encrypt Secrets at rest in etcd (k3s manages the key; see the guide for
+# rotation with "k3s secrets-encrypt rotate-keys").
+secrets-encryption: true
+
+# kubeconfig readable by root only.
+write-kubeconfig-mode: "0600"
+
+# etcd snapshots every 6 hours, 28 kept (one week). Copy them off the host
+# too: see the guide, "Back up etcd".
+etcd-snapshot-schedule-cron: "0 */6 * * *"
+etcd-snapshot-retention: 28
+
+# All servers also run workloads: no NoSchedule taint on purpose.

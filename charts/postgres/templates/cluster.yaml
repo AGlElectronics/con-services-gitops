@@ -1,0 +1,126 @@
+# The shared PostgreSQL server of Con Services, run by CloudNativePG.
+# Docs: https://aglelectronics.github.io/con-services/deploy/data/
+#
+# Topology: 3 instances (1 primary, 2 streaming standbys) on 3 different
+# nodes. A commit returns once the primary AND at least one standby have the
+# WAL (quorum synchronous replication, ANY 1), so losing one node loses no
+# committed data. If both standbys are gone, writes wait instead of silently
+# continuing without a copy (dataDurability: required).
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: conservices-pg
+  namespace: conservices-data
+spec:
+  description: Con Services shared PostgreSQL (Den, Keycloak and every module)
+  instances: {{ .Values.instances }}
+  # PostgreSQL 16: Den's operator runs pg_dump from a postgres:16 image and
+  # pg_dump refuses to dump a newer server. Raise both together.
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.15-standard-trixie
+  imagePullPolicy: IfNotPresent
+
+  # Updates: restart standbys first, then switch over to an updated standby.
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  # CloudNativePG creates the PodDisruptionBudgets itself.
+  enablePDB: true
+
+  # The network policies select PostgreSQL pods by this label. A restore
+  # cluster must carry it too.
+  inheritedMetadata:
+    labels:
+      conservices.io/postgres: "true"
+
+  # Den's operator logs in as the superuser (PG_ADMIN_URL) for its backups.
+  enableSuperuserAccess: true
+  superuserSecret:
+    name: conservices-pg-superuser
+
+  bootstrap:
+    initdb:
+      # The first database. Every other one comes from a Database object.
+      database: den
+      owner: den
+      secret:
+        name: conservices-pg-role-den
+      dataChecksums: true
+      encoding: UTF8
+
+  postgresql:
+    parameters:
+      max_connections: "300"
+      shared_buffers: 256MB
+      effective_cache_size: 768MB
+      work_mem: 8MB
+      maintenance_work_mem: 128MB
+      wal_compression: "on"
+      log_min_duration_statement: "2s"
+      password_encryption: scram-sha-256
+      ssl_min_protocol_version: TLSv1.2
+    {{- if gt (int .Values.instances) 1 }}
+    synchronous:
+      # Quorum: wait for any 1 standby.
+      method: any
+      number: 1
+      dataDurability: required
+      # Only promote a standby known to hold every committed transaction.
+      failoverQuorum: true
+    {{- end }}
+    # Every network login uses TLS, and a role named like its database
+    # ("sameuser") may only connect to that database.
+    pg_hba:
+      - hostnossl all all all reject
+      - hostssl all postgres all scram-sha-256
+      - hostssl sameuser all all scram-sha-256
+      - hostssl all all all reject
+
+  certificates:
+    serverTLSSecret: conservices-pg-server-tls
+    serverCASecret: conservices-pg-server-tls
+
+  storage:
+    {{- with .Values.storage.className }}
+    storageClass: {{ . }}
+    {{- end }}
+    size: {{ .Values.storage.size }}
+    resizeInUseVolumes: true
+  walStorage:
+    {{- with .Values.storage.className }}
+    storageClass: {{ . }}
+    {{- end }}
+    size: {{ .Values.storage.walSize }}
+    resizeInUseVolumes: true
+
+  # Required anti-affinity: never two instances on one node. With fewer
+  # nodes than instances, the extra instances stay Pending.
+  affinity:
+    enablePodAntiAffinity: true
+    podAntiAffinityType: required
+    topologyKey: kubernetes.io/hostname
+
+  resources:
+    {{- toYaml .Values.resources | nindent 4 }}
+
+  # One login per application. Passwords come from OpenBao through the
+  # ExternalSecrets in external-secrets.yaml.
+  managed:
+    roles:
+      {{- range .Values.roles }}
+      - name: {{ . }}
+        ensure: present
+        login: true
+        {{- if eq . "events" }}
+        comment: Rally
+        {{- end }}
+        passwordSecret:
+          name: conservices-pg-role-{{ . }}
+      {{- end }}
+
+  # Continuous WAL archiving and base backups (backups.yaml).
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      enabled: true
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: conservices-pg-backups

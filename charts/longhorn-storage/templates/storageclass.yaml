@@ -1,0 +1,23 @@
+# "longhorn-single": ONE copy of the data, on the node that runs the pod.
+#
+# For workloads that replicate across nodes themselves: CloudNativePG (3
+# PostgreSQL instances) and OpenBao (Raft, 3 voters). With a 3-replica class
+# each would store 3 x 3 = 9 copies for no extra safety: if a node dies, the
+# application's own replicas on the other nodes take over.
+#
+# strict-local keeps reads and writes on the local disk. WaitForFirstConsumer
+# creates the volume once the pod is scheduled, so it lands on that node.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn-single
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  numberOfReplicas: "1"
+  dataLocality: strict-local
+  staleReplicaTimeout: "30"
+  fsType: ext4
+  dataEngine: v1

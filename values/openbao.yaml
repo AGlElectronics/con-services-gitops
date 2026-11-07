@@ -1,0 +1,40 @@
+# OpenBao 2.7.2 (chart openbao/openbao 0.30.7): fixed settings. Replicas,
+# resources, volume sizes and classes, and the server configuration (Raft
+# with one retry_join per replica) come from cluster.yaml (openbao.*)
+# through the root chart.
+# Guide: https://aglelectronics.github.io/con-services/deploy/secrets-openbao/
+#
+# OpenBao starts SEALED after every pod restart and must be unsealed with 3
+# of the 5 unseal keys (bootstrap/scripts/openbao-unseal.sh) before it serves
+# requests. The guide explains the auto-unseal alternatives.
+
+global:
+  # TLS between clients and OpenBao and between the Raft peers.
+  tlsDisable: false
+
+injector:
+  # Secrets reach pods through External Secrets Operator, not the injector.
+  enabled: false
+
+ui:
+  enabled: true
+
+server:
+  # The certificate "openbao-tls" (internal CA) comes from
+  # charts/openbao-extras and is mounted at /openbao/userconfig/openbao-tls/.
+  extraVolumes:
+    - type: secret
+      name: openbao-tls
+
+  extraEnvironmentVars:
+    # The bao CLI inside the pods trusts the internal CA.
+    BAO_CACERT: /openbao/userconfig/openbao-tls/ca.crt
+
+  ha:
+    enabled: true
+    disruptionBudget:
+      enabled: true
+      maxUnavailable: 1
+    raft:
+      enabled: true
+      setNodeId: true

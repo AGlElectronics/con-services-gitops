@@ -1,0 +1,87 @@
+# Rally access configuration.
+#
+# This TOML file is the single source of truth for the role → permission
+# catalog and the OIDC-group → role bindings. It is read once at startup;
+# restart the backend after editing.
+#
+# Permission reference — add new names in internal/domain/domain.go,
+# otherwise the loader rejects them.
+#
+#   Organization: org.view  org.manage
+#   Edition:      edition.view  edition.edit
+#   Members:      member.view  member.manage
+#   Audit:        audit.view
+#   CfP:          cfp.manage  submission.review  submission.decide
+#   Schedule:     schedule.edit  schedule.publish
+#
+# A role listed here replaces its built-in permission set entirely.
+
+# Organization (slug) that bindings grant roles in, unless a binding sets
+# its own `organization`.
+organization = "demo-org"
+
+# -------------------------------------------------------------------------
+# Roles
+# -------------------------------------------------------------------------
+
+[roles.organization_admin]
+description = "Full control of the organization: editions, CfPs, members."
+permissions = [
+  "org.view", "org.manage",
+  "edition.view", "edition.edit",
+  "member.view", "member.manage",
+  "audit.view",
+  "cfp.manage", "submission.review", "submission.decide",
+  "schedule.edit", "schedule.publish",
+]
+
+[roles.edition_organizer]
+description = "Events lead: runs editions and calls for papers, decides on submissions, builds and publishes the schedule."
+permissions = [
+  "org.view",
+  "edition.view", "edition.edit",
+  "member.view", "audit.view",
+  "cfp.manage", "submission.review", "submission.decide",
+  "schedule.edit", "schedule.publish",
+]
+
+[roles.programme_manager]
+description = "Curates the programme: decides on submissions, builds and publishes the schedule."
+permissions = [
+  "org.view", "edition.view", "member.view",
+  "submission.review", "submission.decide",
+  "schedule.edit", "schedule.publish",
+]
+
+[roles.reviewer]
+description = "Reads, comments on and scores submissions; the lead decides."
+permissions = ["org.view", "edition.view", "submission.review"]
+
+[roles.submitter]
+description = "Submits talks to open calls for papers."
+permissions = ["org.view", "edition.view"]
+
+[roles.viewer]
+description = "Read-only access to the organization and editions."
+permissions = ["org.view", "edition.view"]
+
+# -------------------------------------------------------------------------
+# OIDC group → role bindings (organization-wide, evaluated per request:
+# removing someone from the group revokes the role on their next request)
+# -------------------------------------------------------------------------
+
+[[bindings]]
+group = "events-admin"
+role = "organization_admin"
+
+[[bindings]]
+group = "events-organizer"
+role = "edition_organizer"
+
+[[bindings]]
+group = "events-programme"
+role = "programme_manager"
+
+[[bindings]]
+group = "events-reviewer"
+role = "reviewer"

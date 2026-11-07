@@ -1,0 +1,107 @@
+# Renders the whole template with examples/cluster.example-filled.yaml and
+# validates the result. Runs on every push and pull request; also useful in
+# your private copy (it then checks the template code, not your cluster.yaml,
+# unless you change VALUES_FILE).
+name: validate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HELM_VERSION: v3.19.0
+  KUBECTL_VERSION: v1.36.1
+  KUBECONFORM_VERSION: v0.8.0
+  SHELLCHECK_VERSION: v0.11.0
+  KUBERNETES_VERSION: 1.37.0
+  VALUES_FILE: examples/cluster.example-filled.yaml
+  # Branch or tag of AGlElectronics/con-services whose charts are rendered.
+  # Pin it to the release in charts.targetRevision once that tag exists.
+  CHARTS_REF: main
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: gitops
+
+      - uses: actions/checkout@v5
+        with:
+          repository: AGlElectronics/con-services
+          ref: ${{ env.CHARTS_REF }}
+          path: con-services
+          sparse-checkout: deploy/charts
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/bin"
+          curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" \
+            | tar -xz -C "$HOME/bin" --strip-components=1 linux-amd64/helm
+          curl -fsSL -o "$HOME/bin/kubectl" \
+            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          chmod +x "$HOME/bin/kubectl"
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz -C "$HOME/bin" kubeconform
+          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+            | tar -xJ -C "$HOME/bin" --strip-components=1 "shellcheck-${SHELLCHECK_VERSION}/shellcheck"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          pip install pyyaml==6.0.3
+
+      - name: No installation data, no latest tags
+        working-directory: gitops
+        run: python ci/no-installation-data.py .
+
+      - name: Shell scripts
+        working-directory: gitops
+        run: |
+          set -euo pipefail
+          mapfile -t scripts < <(git ls-files '*.sh')
+          for f in "${scripts[@]}"; do bash -n "$f"; done
+          shellcheck -x --source-path=SCRIPTDIR "${scripts[@]}"
+
+      - name: Lint charts
+        working-directory: gitops
+        run: |
+          set -euo pipefail
+          helm lint charts/root -f "$VALUES_FILE"
+          for c in charts/*/; do
+            [[ "$c" == charts/root/ ]] || helm lint "$c"
+          done
+
+      - name: Root chart rejects an incomplete cluster.yaml
+        working-directory: gitops
+        run: |
+          if helm template root charts/root -f cluster.yaml >/dev/null 2>err.txt; then
+            echo "the blank cluster.yaml rendered without error"; exit 1
+          fi
+          grep -q "cluster.yaml is not complete" err.txt
+
+      - name: Render every Application source
+        working-directory: gitops
+        run: python ci/render.py --values "$VALUES_FILE" --main-repo ../con-services --out build/rendered
+
+      - name: Resources and image tags
+        working-directory: gitops
+        run: python ci/check.py build/rendered --sizing
+
+      - name: Schemas (kubeconform, strict)
+        working-directory: gitops
+        run: |
+          set -euo pipefail
+          python ci/crd-schemas.py build/rendered build/schemas
+          kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSION" \
+            -skip CustomResourceDefinition \
+            -schema-location default \
+            -schema-location 'build/schemas/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            build/rendered

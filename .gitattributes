@@ -1,0 +1,5 @@
+# Everything in this repository is read on Linux (Argo CD, CI, cluster
+# nodes); store text files with LF line endings on every platform.
+* text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf

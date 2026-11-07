@@ -1,0 +1,52 @@
+# keycloak-public: Keycloak on port 443. Two users:
+#   - the public Gateway (HTTPRoutes auth.<domain>, auth-admin.<domain>);
+#   - pods inside the cluster: CoreDNS rewrites auth.<domain> to this
+#     Service, so https://auth.<domain>/realms/... works without leaving
+#     the cluster (backends check tokens against that issuer).
+# The selector matches the labels the Keycloak Operator puts on its pods.
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-public
+  namespace: conservices-identity
+  labels:
+    app.kubernetes.io/name: keycloak
+spec:
+  selector:
+    app: keycloak
+    app.kubernetes.io/instance: keycloak
+    app.kubernetes.io/managed-by: keycloak-operator
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8443
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: keycloak
+  namespace: conservices-identity
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: keycloak
+      app.kubernetes.io/instance: keycloak
+      app.kubernetes.io/managed-by: keycloak-operator
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: BackendTLSPolicy
+metadata:
+  name: keycloak-public
+  namespace: conservices-identity
+spec:
+  targetRefs:
+    - group: ""
+      kind: Service
+      name: keycloak-public
+  validation:
+    caCertificateRefs:
+      - group: ""
+        kind: ConfigMap
+        name: conservices-internal-ca
+    hostname: keycloak-public.conservices-identity.svc.cluster.local

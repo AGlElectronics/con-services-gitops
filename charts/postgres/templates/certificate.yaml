@@ -1,0 +1,45 @@
+# Server certificate of the PostgreSQL cluster, signed by the internal CA.
+# Clients connect with sslmode=verify-full and the trust-manager ConfigMap
+# conservices-internal-ca, so every service name they may use is a SAN.
+#
+# CloudNativePG reads tls.crt/tls.key (serverTLSSecret) and ca.crt
+# (serverCASecret) from this one Secret. The cnpg.io/reload label makes the
+# operator reload PostgreSQL when cert-manager renews it.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: conservices-pg-server
+  namespace: conservices-data
+spec:
+  secretName: conservices-pg-server-tls
+  secretTemplate:
+    labels:
+      cnpg.io/reload: ""
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: conservices-internal-ca
+  duration: 2160h
+  renewBefore: 720h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  usages:
+    - server auth
+    - digital signature
+    - key encipherment
+  commonName: conservices-pg-rw
+  dnsNames:
+    - conservices-pg-rw
+    - conservices-pg-rw.conservices-data
+    - conservices-pg-rw.conservices-data.svc
+    - conservices-pg-rw.conservices-data.svc.cluster.local
+    - conservices-pg-ro
+    - conservices-pg-ro.conservices-data
+    - conservices-pg-ro.conservices-data.svc
+    - conservices-pg-ro.conservices-data.svc.cluster.local
+    - conservices-pg-r
+    - conservices-pg-r.conservices-data
+    - conservices-pg-r.conservices-data.svc
+    - conservices-pg-r.conservices-data.svc.cluster.local

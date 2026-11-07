@@ -1,0 +1,24 @@
+# COPY of deploy/kubernetes/base/pki/bundle.yaml in AGlElectronics/con-services.
+# Keep both identical until the main repository has a release tag.
+#
+# trust-manager copies the root CA's PUBLIC certificate into a ConfigMap
+# "conservices-internal-ca" (key ca.crt) in every Con Services namespace.
+# Pods mount it at /etc/conservices-internal-ca and use it to check the
+# certificates of the services they call. No private key leaves cert-manager.
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: conservices-internal-ca
+spec:
+  sources:
+    - secret:
+        name: conservices-internal-ca
+        key: tls.crt
+    # While rotating the root, add the previous root here as a second
+    # source so certificates signed by either one are trusted.
+  target:
+    configMap:
+      key: ca.crt
+    namespaceSelector:
+      matchLabels:
+        app.kubernetes.io/part-of: conservices

@@ -1,0 +1,48 @@
+# Namespaces shared by several platform Applications. Each one is created
+# here, once, so no two Applications fight over its labels.
+#
+# app.kubernetes.io/part-of: conservices -> trust-manager copies the internal
+# CA ConfigMap (conservices-internal-ca) into the namespace, and the public
+# Gateway accepts HTTPRoutes from it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cnpg-system
+  labels:
+    app.kubernetes.io/part-of: conservices
+    conservices.io/tier: platform
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: conservices-data
+  labels:
+    app.kubernetes.io/part-of: conservices
+    conservices.io/tier: data
+    # CloudNativePG instance pods meet "restricted".
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: conservices-identity
+  labels:
+    app.kubernetes.io/part-of: conservices
+    conservices.io/tier: platform
+    # The Keycloak Operator generates the Keycloak StatefulSet and the realm
+    # import Jobs itself. Their security context is set through
+    # spec.unsupported.podTemplate, which upstream does not guarantee for
+    # every generated pod, so "restricted" is only warned and audited here.
+    # Switch enforce to restricted once `kubectl get events -n
+    # conservices-identity` shows no PodSecurity warnings after a full sync.
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted

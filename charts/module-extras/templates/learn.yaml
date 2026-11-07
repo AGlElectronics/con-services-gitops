@@ -1,0 +1,57 @@
+{{- if eq .Values.app "learn" }}
+# Secrets of Learn in conservices-learn, built by External Secrets from OpenBao
+# (ClusterSecretStore "openbao", KV v2 at "kv"). Nothing secret is in Git.
+# Fill the OpenBao entries with bootstrap/scripts/openbao-seed.sh.
+# Inventory: https://aglelectronics.github.io/con-services/operations/secrets/
+#
+# DATABASE_URL: the role's password comes from the same OpenBao entry that
+# CloudNativePG uses for the role (charts/postgres), so they always
+# agree. Passwords are hex, so they need no escaping inside the URL.
+#
+# Optional keys (SMTP_PASSWORD, TELEGRAM_BOT_TOKEN) are not included: add a
+# data entry and a template line here once the OpenBao entry exists.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: learn-secrets
+  namespace: conservices-learn
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: openbao
+  target:
+    name: learn-secrets
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        DATABASE_URL: "postgres://learn:{{`{{ .dbPassword }}`}}@conservices-pg-rw.conservices-data.svc.cluster.local:5432/learn?sslmode=verify-full&sslrootcert=/etc/conservices-internal-ca/ca.crt"
+        S3_ACCESS_KEY_ID: "{{`{{ .s3AccessKey }}`}}"
+        S3_SECRET_ACCESS_KEY: "{{`{{ .s3SecretKey }}`}}"
+        KEYCLOAK_CLIENT_SECRET: "{{`{{ .keycloakClientSecret }}`}}"
+        LEARN_SERVICE_TOKEN: "{{`{{ .learnToken }}`}}"
+  data:
+    - secretKey: dbPassword
+      remoteRef:
+        key: conservices/postgres/roles/learn
+        property: password
+    - secretKey: s3AccessKey
+      remoteRef:
+        key: conservices/learn/s3
+        property: access_key
+    - secretKey: s3SecretKey
+      remoteRef:
+        key: conservices/learn/s3
+        property: secret_key
+    - secretKey: keycloakClientSecret
+      remoteRef:
+        key: conservices/keycloak/clients
+        property: learn-provisioner
+    - secretKey: learnToken
+      remoteRef:
+        key: conservices/service-tokens/learn
+        property: token
+{{- end }}

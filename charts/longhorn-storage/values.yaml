@@ -1,0 +1,2 @@
+# No settings. Installed when cluster.yaml sets storage.longhornSingle.enabled.
+{}

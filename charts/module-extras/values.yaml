@@ -1,0 +1,10 @@
+# Set by the root chart from cluster.yaml.
+# den, stash, hr, rally, finance, learn, wiki, desk or tasks.
+app: stash
+namespace: conservices-stash
+# Enabled modules (HR only adds hooks for these).
+enabledModules: [stash, hr, rally, finance, learn, wiki, desk, tasks]
+# true: create the Secret ghcr-pull from OpenBao kv/infra/ghcr.
+pullSecret: false
+# Access configuration (TOML). Empty: files/access-config/<app>.toml.
+accessConfig: ""

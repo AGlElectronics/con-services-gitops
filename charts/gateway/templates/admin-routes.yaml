@@ -1,0 +1,85 @@
+{{- /*
+Admin UIs on the INTERNAL Gateway only. These names must resolve to the
+internal Gateway IP on your network (split DNS, local DNS records or a hosts
+file); see deploy/dns-and-certificates. Argo CD's route comes from its own
+chart, Keycloak's admin route from charts/keycloak.
+*/ -}}
+{{- $d := .Values.domain }}
+{{- if .Values.adminRoutes.openbao }}
+# OpenBao serves TLS itself (certificate openbao-tls from the internal CA).
+# The Gateway re-encrypts and verifies the certificate against the internal
+# CA bundle. Never use wellKnownCACertificates with Cilium: it silently
+# falls back to plaintext.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: openbao
+  namespace: openbao
+spec:
+  parentRefs:
+    - name: internal
+      namespace: conservices-gateway
+      sectionName: https
+  hostnames:
+    - bao.{{ $d }}
+  rules:
+    - backendRefs:
+        - name: openbao-active
+          port: 8200
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: BackendTLSPolicy
+metadata:
+  name: openbao
+  namespace: openbao
+spec:
+  targetRefs:
+    - group: ""
+      kind: Service
+      name: openbao-active
+  validation:
+    hostname: openbao.openbao.svc
+    caCertificateRefs:
+      - group: ""
+        kind: ConfigMap
+        name: conservices-internal-ca
+{{- end }}
+{{- if .Values.adminRoutes.longhorn }}
+---
+# Longhorn's UI has NO login: anyone who reaches it can delete volumes.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: longhorn
+  namespace: longhorn-system
+spec:
+  parentRefs:
+    - name: internal
+      namespace: conservices-gateway
+      sectionName: https
+  hostnames:
+    - longhorn.{{ $d }}
+  rules:
+    - backendRefs:
+        - name: longhorn-frontend
+          port: 80
+{{- end }}
+{{- if .Values.adminRoutes.hubble }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: hubble-ui
+  namespace: kube-system
+spec:
+  parentRefs:
+    - name: internal
+      namespace: conservices-gateway
+      sectionName: https
+  hostnames:
+    - hubble.{{ $d }}
+  rules:
+    - backendRefs:
+        - name: hubble-ui
+          port: 80
+{{- end }}

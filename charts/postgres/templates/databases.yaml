@@ -1,0 +1,21 @@
+{{- /*
+One database per application, owned by the role of the same name. The
+pg_hba "sameuser" rule lets each role into its own database only.
+databaseReclaimPolicy: retain -> disabling a module (or deleting the
+Application) never drops its data; drop a database by hand if you mean it.
+*/ -}}
+{{- range .Values.roles }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: conservices-pg-{{ . }}
+  namespace: conservices-data
+spec:
+  cluster:
+    name: conservices-pg
+  name: {{ . }}
+  owner: {{ . }}
+  ensure: present
+  databaseReclaimPolicy: retain
+{{- end }}

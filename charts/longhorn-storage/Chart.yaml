@@ -1,0 +1,6 @@
+apiVersion: v2
+name: longhorn-storage
+description: >-
+  The StorageClass longhorn-single (one Longhorn replica) for workloads that replicate themselves. Values come from the root chart (cluster.yaml).
+type: application
+version: 1.0.0

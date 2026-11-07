@@ -1,0 +1,6 @@
+apiVersion: v2
+name: module-extras
+description: >-
+  Per-app extras of Den and the modules: ExternalSecrets, pull secret, access configuration. Values come from the root chart (cluster.yaml).
+type: application
+version: 1.0.0

@@ -1,0 +1,73 @@
+# Network policies of conservices-data for PostgreSQL. The namespace-wide
+# default deny and DNS rule live in components/platform-namespaces.
+#
+# Pods are selected by conservices.io/postgres (set through the Cluster's
+# inheritedMetadata), not by cluster name, so a restore cluster
+# (deploy/data.md#restore) gets the same rules without editing this file.
+# Docs: https://aglelectronics.github.io/con-services/operations/network-policies/
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: conservices-pg
+  namespace: conservices-data
+spec:
+  podSelector:
+    matchLabels:
+      conservices.io/postgres: "true"
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # Replication and the instance manager's status API between instances.
+    - from:
+        - podSelector:
+            matchLabels:
+              conservices.io/postgres: "true"
+      ports:
+        - { protocol: TCP, port: 5432 }
+        - { protocol: TCP, port: 8000 }
+    # The CloudNativePG operator: status API (8000) and SQL checks (5432).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+      ports:
+        - { protocol: TCP, port: 8000 }
+        - { protocol: TCP, port: 5432 }
+    # Applications: every module namespace, Den and Keycloak.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              conservices.io/tier: module
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: conservices-den
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: conservices-identity
+      ports:
+        - { protocol: TCP, port: 5432 }
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              conservices.io/postgres: "true"
+      ports:
+        - { protocol: TCP, port: 5432 }
+        - { protocol: TCP, port: 8000 }
+    # WAL archive and base backups go to the managed S3 service: allowed by
+    # FQDN in the CiliumNetworkPolicy conservices-pg-s3 (backups.yaml).
+---
+# The instance manager in every PostgreSQL pod watches its Cluster object
+# and updates its status, so it must reach the Kubernetes API. With Cilium
+# the API server is matched by entity, not by IP block.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: conservices-pg-kube-apiserver
+  namespace: conservices-data
+spec:
+  endpointSelector:
+    matchLabels:
+      conservices.io/postgres: "true"
+  egress:
+    - toEntities:
+        - kube-apiserver

@@ -1,0 +1,5 @@
+# Set by the root chart from cluster.yaml (loadBalancer.ciliumL2.*).
+# CIDRs ("192.0.2.240/29") or ranges ({start: 192.0.2.240, stop: 192.0.2.247}).
+blocks: []
+# Node interfaces to announce on (regular expressions). Empty: all.
+interfaces: []

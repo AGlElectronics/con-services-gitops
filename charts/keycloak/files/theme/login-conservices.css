@@ -1,0 +1,195 @@
+/* Con Services login look. Colours are overridden at runtime from Den's
+   brand (js/brand.js writes :root and html.pf-v5-theme-dark); these are the
+   defaults. Dark mode follows the OS (Keycloak sets pf-v5-theme-dark). */
+:root {
+  --cs-primary: #5048e5;
+  --cs-primary-hover: #4338ca;
+  --cs-primary-dark: hsl(243 75% 59%);
+  --cs-primary-dark-hover: hsl(243 75% 65%);
+  --cs-primary-fg: #ffffff;
+  --cs-primary-dark-fg: #ffffff;
+  --cs-button-fg: var(--cs-primary-fg);
+  --cs-bg: #f5f5f7;
+  --cs-surface: #ffffff;
+  --cs-fg: #1c1b22;
+  --cs-border: #e4e4e7;
+
+  --pf-v5-global--Color--100: var(--cs-fg);
+  --pf-v5-global--BorderColor--100: var(--cs-border);
+  --pf-v5-global--primary-color--100: var(--cs-primary);
+  --pf-v5-global--primary-color--200: var(--cs-primary-hover);
+  --pf-v5-global--active-color--100: var(--cs-primary);
+  --pf-v5-global--link--Color: var(--cs-primary);
+  --pf-v5-global--link--Color--hover: var(--cs-primary-hover);
+  --pf-v5-global--FontFamily--text: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --pf-v5-global--FontFamily--heading: var(--pf-v5-global--FontFamily--text);
+}
+
+html.pf-v5-theme-dark {
+  --cs-bg: hsl(243 9% 10%);
+  --cs-surface: hsl(243 9% 13%);
+  --cs-fg: hsl(243 10% 96%);
+  --cs-border: hsl(243 9% 22%);
+  --cs-button-fg: var(--cs-primary-dark-fg);
+
+  --pf-v5-global--Color--100: var(--cs-fg);
+  --pf-v5-global--BorderColor--100: var(--cs-border);
+  --pf-v5-global--BackgroundColor--100: var(--cs-surface);
+
+  --pf-v5-global--primary-color--100: var(--cs-primary-dark);
+  --pf-v5-global--primary-color--200: var(--cs-primary-dark-hover);
+  --pf-v5-global--primary-color--300: var(--cs-primary-dark);
+  --pf-v5-global--primary-color--400: var(--cs-primary-dark-hover);
+  --pf-v5-global--active-color--100: var(--cs-primary-dark);
+  --pf-v5-global--active-color--300: var(--cs-primary-dark);
+  --pf-v5-global--active-color--400: var(--cs-primary-dark);
+  --pf-v5-global--link--Color: var(--cs-primary-dark);
+  --pf-v5-global--link--Color--hover: var(--cs-primary-dark-hover);
+  --pf-v5-global--link--Color--light: var(--cs-primary-dark);
+  --pf-v5-global--link--Color--light--hover: var(--cs-primary-dark-hover);
+}
+
+.login-pf body {
+  background:
+    radial-gradient(60rem 30rem at 50% -10%, color-mix(in srgb, var(--cs-primary) 16%, transparent), transparent 70%),
+    var(--cs-bg);
+  background-attachment: fixed;
+}
+
+html.pf-v5-theme-dark.login-pf body {
+  background:
+    radial-gradient(60rem 30rem at 50% -10%, color-mix(in srgb, var(--cs-primary-dark) 14%, transparent), transparent 70%),
+    var(--cs-bg);
+  background-attachment: fixed;
+}
+
+.pf-v5-c-login__container {
+  grid-template-columns: minmax(0, 28rem);
+}
+
+#kc-header-wrapper {
+  color: var(--cs-fg) !important;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  font-size: 1.6rem;
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+#kc-header-wrapper .cs-logo {
+  max-height: 72px;
+  max-width: 240px;
+  object-fit: contain;
+}
+
+#kc-header-wrapper .cs-tagline {
+  font-size: 0.9rem;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.pf-v5-c-login__main {
+  background-color: var(--cs-surface);
+  color: var(--cs-fg);
+  border: 1px solid var(--cs-border);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 12px 32px -12px rgb(0 0 0 / 0.18);
+  overflow: hidden;
+}
+
+/* Background picture (js/brand.js sets --cs-login-image and the layout class).
+   Narrow screens always get the centred card over the dimmed picture. */
+html.cs-has-bg.login-pf body {
+  background: var(--cs-login-image) center / cover no-repeat fixed, var(--cs-bg);
+}
+
+html.cs-has-bg .pf-v5-c-login {
+  flex-direction: column;
+  background: rgb(0 0 0 / 0.4);
+}
+
+html.cs-has-bg #kc-header-wrapper {
+  color: #fff !important;
+  text-shadow: 0 1px 12px rgb(0 0 0 / 0.55);
+}
+
+.cs-caption {
+  max-width: 40rem;
+  margin: 1.5rem auto 0;
+  padding: 0 1rem;
+  text-align: center;
+  color: #fff;
+  font-size: 1.1rem;
+  line-height: 1.4;
+  text-shadow: 0 1px 14px rgb(0 0 0 / 0.65);
+}
+
+@media (min-width: 64rem) {
+  html.cs-layout-panel .pf-v5-c-login {
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: stretch;
+    padding: 0;
+    background: none;
+  }
+
+  html.cs-layout-panel .pf-v5-c-login__container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 30rem;
+    max-width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 3rem 2.5rem;
+    background: var(--cs-surface);
+    box-shadow: -16px 0 48px rgb(0 0 0 / 0.35);
+  }
+
+  html.cs-layout-panel #kc-header-wrapper {
+    color: var(--cs-fg) !important;
+    text-shadow: none;
+  }
+
+  html.cs-layout-panel .pf-v5-c-login__main {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  html.cs-layout-panel .cs-caption {
+    position: fixed;
+    top: 50%;
+    left: 0;
+    right: 30rem;
+    max-width: none;
+    margin: 0;
+    padding: 0 4rem;
+    transform: translateY(-50%);
+    font-size: 2rem;
+    font-weight: 300;
+  }
+}
+
+.pf-v5-c-form-control {
+  --pf-v5-c-form-control--focus--after--BorderBottomColor: var(--cs-primary);
+  --pf-v5-c-form-control--hover--after--BorderBottomColor: var(--cs-primary);
+}
+
+html.pf-v5-theme-dark .pf-v5-c-form-control {
+  --pf-v5-c-form-control--focus--after--BorderBottomColor: var(--cs-primary-dark);
+  --pf-v5-c-form-control--hover--after--BorderBottomColor: var(--cs-primary-dark);
+}
+
+.pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--Color: var(--cs-button-fg);
+  --pf-v5-c-button--m-primary--hover--Color: var(--cs-button-fg);
+  --pf-v5-c-button--m-primary--focus--Color: var(--cs-button-fg);
+  --pf-v5-c-button--m-primary--active--Color: var(--cs-button-fg);
+  border-radius: 10px;
+  font-weight: 600;
+}

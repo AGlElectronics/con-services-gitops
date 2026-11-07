@@ -1,0 +1,44 @@
+# OpenBao's TLS certificate, from the internal CA. Covers the Service names
+# clients use, each pod's name for Raft (retry_join), 127.0.0.1 for the CLI
+# inside the pods, and the admin hostname on the internal Gateway.
+#
+# OpenBao reads the certificate only at start and on SIGHUP. A restart seals
+# the pod, so after each renewal (once a year) reload it in place:
+#   for i in 0 1 2; do kubectl exec -n openbao openbao-$i -- sh -c 'kill -HUP $(pidof bao)'; done
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: openbao-tls
+  namespace: openbao
+  annotations:
+    # Before the StatefulSet that mounts it.
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  secretName: openbao-tls
+  duration: 8760h
+  renewBefore: 720h
+  commonName: openbao.openbao.svc
+  dnsNames:
+    - openbao
+    - openbao.openbao
+    - openbao.openbao.svc
+    - openbao.openbao.svc.cluster.local
+    - openbao-active.openbao.svc
+    - openbao-active.openbao.svc.cluster.local
+    - "*.openbao-internal"
+    - "*.openbao-internal.openbao.svc"
+    - "*.openbao-internal.openbao.svc.cluster.local"
+    - bao.{{ .Values.domain }}
+  ipAddresses:
+    - 127.0.0.1
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  usages:
+    - server auth
+    - client auth
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: conservices-internal-ca

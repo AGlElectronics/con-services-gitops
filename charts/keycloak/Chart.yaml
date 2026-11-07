@@ -1,0 +1,6 @@
+apiVersion: v2
+name: keycloak
+description: >-
+  Keycloak (Keycloak Operator), its routes, theme, secrets, network policies and realm imports. Values come from the root chart (cluster.yaml).
+type: application
+version: 1.0.0

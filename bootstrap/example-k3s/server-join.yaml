@@ -1,0 +1,39 @@
+# k3s configuration for the SECOND and THIRD server nodes (node-2 and
+# node-3). Copy to /etc/rancher/k3s/config.yaml on each of them BEFORE
+# installing k3s, and copy /etc/rancher/k3s/cluster-token from node-1:
+#
+#   sudo install -d -m 755 /etc/rancher/k3s
+#   sudo install -m 600 server-join.yaml /etc/rancher/k3s/config.yaml
+#   sudo install -m 600 cluster-token /etc/rancher/k3s/cluster-token
+#   curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.37.2+k3s1 sh -s - server
+#
+# Guide: https://aglelectronics.github.io/con-services/deploy/cluster/
+#
+# Every server must use the same flags as the first one (k3s refuses to join
+# otherwise); only "cluster-init" is replaced by "server".
+
+server: https://10.0.0.11:6443   # node-1
+token-file: /etc/rancher/k3s/cluster-token
+
+tls-san:
+  - k8s.example.org
+  - 10.0.0.11
+  - 10.0.0.12
+  - 10.0.0.13
+
+cluster-cidr: 10.42.0.0/16
+service-cidr: 10.43.0.0/16
+
+flannel-backend: none
+disable-network-policy: true
+disable-kube-proxy: true
+
+disable:
+  - traefik
+  - servicelb
+  - local-storage
+
+secrets-encryption: true
+write-kubeconfig-mode: "0600"
+etcd-snapshot-schedule-cron: "0 */6 * * *"
+etcd-snapshot-retention: 28

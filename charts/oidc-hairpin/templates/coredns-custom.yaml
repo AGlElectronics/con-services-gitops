@@ -1,0 +1,23 @@
+# k3s and AKS CoreDNS read extra configuration from the ConfigMap
+# kube-system/coredns-custom: keys ending in ".override" go INSIDE the main
+# server block. https://docs.k3s.io/advanced#coredns-custom-configuration-imports
+#
+# keycloak.override makes pods resolve auth.<domain> to the in-cluster Service
+# keycloak-public (443 -> Keycloak 8443, certificate from the internal CA
+# with the public name). Backends checking sign-in tokens then stay inside
+# the cluster instead of going out through the router and back in. "answer
+# auto" keeps the original name in the answer.
+#
+# This ConfigMap belongs to you, not to k3s or AKS: if you already have one
+# with other keys, merge them into a copy of this chart instead.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  keycloak.override: |
+    rewrite stop {
+        name exact auth.{{ .Values.domain }}. keycloak-public.conservices-identity.svc.cluster.local.
+        answer auto
+    }

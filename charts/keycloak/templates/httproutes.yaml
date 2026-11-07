@@ -1,0 +1,64 @@
+# Public sign-in: only the paths browsers and apps need (Keycloak's
+# "exposed path recommendations"). /admin, /metrics and /health stay
+# off the internet.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: keycloak
+  namespace: conservices-identity
+spec:
+  parentRefs:
+    - name: public
+      namespace: conservices-gateway
+      sectionName: https
+  hostnames:
+    - auth.{{ .Values.domain }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /realms/
+        - path:
+            type: PathPrefix
+            value: /resources/
+      backendRefs:
+        - name: keycloak-public
+          port: 443
+      timeouts:
+        request: 60s
+---
+# Admin console on the INTERNAL Gateway (LAN only). The internal Gateway
+# admits routes from a fixed list of namespaces, so this route lives in
+# conservices-gateway and points across namespaces (ReferenceGrant below).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: keycloak-admin
+  namespace: conservices-gateway
+spec:
+  parentRefs:
+    - name: internal
+      namespace: conservices-gateway
+      sectionName: https
+  hostnames:
+    - auth-admin.{{ .Values.domain }}
+  rules:
+    - backendRefs:
+        - name: keycloak-public
+          namespace: conservices-identity
+          port: 443
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: keycloak-admin-route
+  namespace: conservices-identity
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: conservices-gateway
+  to:
+    - group: ""
+      kind: Service
+      name: keycloak-public

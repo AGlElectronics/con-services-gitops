@@ -1,0 +1,113 @@
+{{- /*
+Two Gateways, each with its own LoadBalancer IP.
+  public:   the internet-facing entry point; forward ports 80 and 443 to it.
+            Routes from namespaces labelled app.kubernetes.io/part-of=conservices.
+  internal: never exposed to the internet. Admin UIs (Argo CD, OpenBao,
+            Keycloak admin console, optionally Longhorn and Hubble); only
+            routes from the namespaces listed below attach.
+*/ -}}
+{{- $internalNamespaces := list "conservices-gateway" "openbao" }}
+{{- if .Values.argocd }}{{ $internalNamespaces = append $internalNamespaces "argocd" }}{{ end }}
+{{- if .Values.adminRoutes.longhorn }}{{ $internalNamespaces = append $internalNamespaces "longhorn-system" }}{{ end }}
+{{- if .Values.adminRoutes.hubble }}{{ $internalNamespaces = append $internalNamespaces "kube-system" }}{{ end }}
+# The Gateways and the wildcard certificate live here. The part-of label lets
+# trust-manager copy the internal CA bundle into it and lets the public
+# Gateway accept the HTTP to HTTPS redirects.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: conservices-gateway
+  labels:
+    app.kubernetes.io/part-of: conservices
+    pod-security.kubernetes.io/enforce: restricted
+  annotations:
+    # Before the wildcard Certificate (-1) and the Gateways (0).
+    argocd.argoproj.io/sync-wave: "-2"
+---
+# One certificate for the domain and every subdomain, used by both Gateways.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-tls
+  namespace: conservices-gateway
+  annotations:
+    # Issued before the Gateways that use it are created.
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  secretName: wildcard-tls
+  dnsNames:
+    - {{ .Values.domain }}
+    - "*.{{ .Values.domain }}"
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: {{ .Values.issuer }}
+{{- range $name := list "public" "internal" }}
+{{- $g := index $.Values $name }}
+{{- $ann := deepCopy ($g.annotations | default dict) }}
+{{- if $g.loadBalancerIP }}{{ $_ := set $ann "lbipam.cilium.io/ips" $g.loadBalancerIP }}{{ end }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ $name }}
+  namespace: conservices-gateway
+spec:
+  gatewayClassName: {{ $.Values.className }}
+  {{- with $ann }}
+  infrastructure:
+    annotations:
+      {{- toYaml . | nindent 6 }}
+  {{- end }}
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.{{ $.Values.domain }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: wildcard-tls
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            {{- if eq $name "public" }}
+            matchLabels:
+              app.kubernetes.io/part-of: conservices
+            {{- else }}
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values: {{ toJson $internalNamespaces }}
+            {{- end }}
+---
+# Answer every plain-HTTP request with a permanent redirect to HTTPS.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $name }}-https-redirect
+  namespace: conservices-gateway
+spec:
+  parentRefs:
+    - name: {{ $name }}
+      sectionName: http
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+{{- end }}

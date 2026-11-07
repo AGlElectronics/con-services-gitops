@@ -1,0 +1,44 @@
+# COPY of deploy/kubernetes/base/pki/issuers.yaml in AGlElectronics/con-services.
+# Keep both identical (names are shared by every Con Services manifest) until
+# the main repository publishes a release tag that can be used as a remote base.
+#
+# The internal root CA lives in the cert-manager namespace (cert-manager's
+# "cluster resource namespace"), the only place its private key exists.
+# conservices-selfsigned only signs the root itself; every service
+# certificate is signed by conservices-internal-ca.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: conservices-selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: conservices-internal-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: Con Services internal CA
+  secretName: conservices-internal-ca
+  # Ten years. Rotating the root is a planned operation: see
+  # docs/operations/internal-tls.md, "Rotating the internal CA".
+  duration: 87600h
+  renewBefore: 720h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: conservices-selfsigned
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: conservices-internal-ca
+spec:
+  ca:
+    secretName: conservices-internal-ca

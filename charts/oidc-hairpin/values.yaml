@@ -1,0 +1,2 @@
+# Set by the root chart from cluster.yaml (oidcHairpin.mode: coredns-custom).
+domain: example.org

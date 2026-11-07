@@ -1,0 +1,16 @@
+# Set by the root chart from cluster.yaml (domain, gateway.*, acme.issuer,
+# adminRoutes.*, argocd.selfManage).
+domain: example.org
+className: cilium
+issuer: letsencrypt-staging
+public:
+  loadBalancerIP: ""
+  annotations: {}
+internal:
+  loadBalancerIP: ""
+  annotations: {}
+adminRoutes:
+  openbao: true
+  longhorn: false
+  hubble: false
+argocd: true

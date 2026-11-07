@@ -1,0 +1,30 @@
+{{- /*
+Not a Kubernetes object. Rendered only with --set global.seedPlan=true:
+bootstrap/scripts/openbao-seed.sh reads it to learn which OpenBao entries
+this cluster.yaml needs.
+*/ -}}
+{{- if (.Values.global).seedPlan }}
+{{- $v := .Values }}
+{{- $meta := include "root.moduleMeta" . | fromYaml }}
+{{- $enabled := include "root.enabledModules" . | fromJsonArray }}
+{{- $roles := list "den" "keycloak" }}
+{{- $s3 := list "postgres/backup-s3" "den/backup-s3" "den/files-s3" "den/s3" }}
+{{- $tokens := list }}
+{{- range $n := $enabled }}
+{{- $m := index $meta $n }}
+{{- $roles = append $roles $m.role }}
+{{- if $m.s3 }}{{ $s3 = append $s3 (printf "%s/s3" $n) }}{{ end }}
+{{- if has $n (list "learn" "wiki" "tasks") }}{{ $tokens = append $tokens $n }}{{ end }}
+{{- end }}
+{{ dict
+  "modules" $enabled
+  "roles" $roles
+  "s3" $s3
+  "serviceTokens" $tokens
+  "desk" (has "desk" $enabled)
+  "smtp" $v.keycloak.smtp.enabled
+  "cloudflare" (eq $v.acme.dns01.provider "cloudflare")
+  "githubArc" $v.arc.enabled
+  "ghcr" $v.images.pullSecret.enabled
+  | toJson }}
+{{- end }}

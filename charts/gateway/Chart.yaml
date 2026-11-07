@@ -1,0 +1,6 @@
+apiVersion: v2
+name: gateway
+description: >-
+  The public and internal Gateways, the wildcard certificate, HTTPS redirects and admin routes. Values come from the root chart (cluster.yaml).
+type: application
+version: 1.0.0

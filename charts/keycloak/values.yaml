@@ -1,0 +1,9 @@
+# Set by the root chart from cluster.yaml (domain, keycloak.*).
+domain: example.org
+instances: 2
+resources:
+  requests: { cpu: 250m, memory: 1Gi }
+  limits: { cpu: "2", memory: 2Gi }
+smtp:
+  # true: realms send mail through OpenBao kv/conservices/keycloak/smtp.
+  enabled: true

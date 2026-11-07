@@ -1,0 +1,41 @@
+{{- /*
+The modules, sync wave 10. One Application per enabled module: the chart
+from the main repository plus charts/module-extras (ExternalSecrets, access
+configuration).
+*/ -}}
+{{- $v := .Values }}
+{{- $meta := include "root.moduleMeta" . | fromYaml }}
+{{- range $n := fromJsonArray (include "root.enabledModules" $) }}
+{{- $m := index $v.modules $n }}
+{{- $mm := index $meta $n }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $n }}
+  namespace: argocd
+  labels:
+    conservices.io/module: {{ $n }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: {{ $v.charts.repoURL }}
+      targetRevision: {{ $v.charts.targetRevision }}
+      path: deploy/charts/{{ $n }}
+      helm:
+        releaseName: {{ $n }}
+        valuesObject:
+          {{- toYaml (mergeOverwrite (include "root.moduleValues" (dict "root" $ "name" $n) | fromYaml) $m.values) | nindent 10 }}
+    {{- include "root.repoSourceItem" (dict "root" $ "path" "charts/module-extras") | nindent 4 }}
+      helm:
+        valuesObject:
+          {{- include "root.extrasValues" (dict "root" $ "name" $n) | nindent 10 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: conservices-{{ $n }}
+  {{- include "root.syncPolicy" (dict "options" (list "CreateNamespace=true" "ServerSideApply=true") "labels" (include "root.nsLabels" (dict "tier" "module" "module" $mm.label) | fromYaml)) | nindent 2 }}
+{{- end }}

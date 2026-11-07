@@ -1,0 +1,62 @@
+# A completely filled cluster.yaml, used by CI (.github/workflows/validate.yml)
+# to render and validate everything. Fictional values (example.org,
+# documentation IP ranges). Do not copy the age key: it is a dummy.
+domain: example.org
+
+git:
+  repoURL: https://github.com/example-org/con-services-gitops.git
+  targetRevision: main
+
+acme:
+  email: admin@example.org
+
+s3:
+  endpoint: https://s3.example-provider.com
+  region: example-region-1
+  bucketPrefix: example
+  pathStyle: true
+  fqdns:
+    - s3.example-provider.com
+    - "*.s3.example-provider.com"
+  backup:
+    endpoint: https://s3.backup.example-provider.net
+    region: example-region-2
+    fqdns:
+      - s3.backup.example-provider.net
+
+den:
+  backupAgeRecipients: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
+
+loadBalancer:
+  ciliumL2:
+    enabled: true
+    blocks: ["192.0.2.240/29"]
+gateway:
+  public:
+    loadBalancerIP: 192.0.2.240
+  internal:
+    loadBalancerIP: 192.0.2.241
+
+oidcHairpin:
+  mode: coredns-custom
+
+storage:
+  longhornSingle:
+    enabled: true
+
+adminRoutes:
+  longhorn: true
+  hubble: true
+
+images:
+  pullSecret:
+    enabled: true
+
+modules:
+  rally:
+    submit:
+      enabled: false
+
+arc:
+  enabled: true
+  githubConfigUrl: https://github.com/example-org

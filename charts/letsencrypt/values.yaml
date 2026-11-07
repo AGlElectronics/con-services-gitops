@@ -1,0 +1,6 @@
+# Set by the root chart from cluster.yaml (acme.*).
+email: admin@example.org
+# cloudflare | custom
+provider: cloudflare
+# With provider "custom": cert-manager ClusterIssuer solvers.
+solvers: []

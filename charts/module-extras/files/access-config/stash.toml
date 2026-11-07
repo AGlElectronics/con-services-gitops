@@ -1,0 +1,187 @@
+# Stash access configuration
+# Restart the backend after editing.
+#
+# ── Permission reference ─────────────────────────────────────────────────────
+# Inventory:    item.view  item.create  item.edit  item.retire  item.move
+#               item.adjust  item.damage  item.lose
+# Sign-outs:    signout.view  signout.create  signout.confirm  signout.return
+#               signout.cancel  signout.close
+# Admin:        department.manage  location.manage  category.manage
+#               user.manage  access.manage  audit.view  export.create  file.upload
+# Lost & Found: lostfound.view  lostfound.create  lostfound.edit  lostfound.resolve
+#               lostfound.reopen  lostfound.delete
+#
+# Roles below replace built-in defaults when listed. Omit a role to keep the
+# code default. Bindings map Keycloak client roles (groups claim) → Stash role.
+
+# ── Roles ────────────────────────────────────────────────────────────────────
+
+# Everything.
+[roles.admin]
+description = "Everything in Stash, including access and settings."
+permissions = [
+  "item.view",
+  "item.create",
+  "item.edit",
+  "item.retire",
+  "item.move",
+  "item.adjust",
+  "item.damage",
+  "item.lose",
+  "signout.view",
+  "signout.create",
+  "signout.confirm",
+  "signout.return",
+  "signout.cancel",
+  "signout.close",
+  "department.manage",
+  "location.manage",
+  "category.manage",
+  "user.manage",
+  "access.manage",
+  "audit.view",
+  "export.create",
+  "file.upload",
+  "lostfound.view",
+  "lostfound.create",
+  "lostfound.edit",
+  "lostfound.resolve",
+  "lostfound.reopen",
+  "lostfound.delete",
+]
+
+# Logistics / inventory team — items, sign-outs, locations, no L&F.
+[roles.inventory_manager]
+description = "Logistics team: items, sign-outs, locations and categories. No Lost & Found."
+permissions = [
+  "item.view",
+  "item.create",
+  "item.edit",
+  "item.retire",
+  "item.move",
+  "item.adjust",
+  "item.damage",
+  "item.lose",
+  "signout.view",
+  "signout.create",
+  "signout.confirm",
+  "signout.return",
+  "signout.cancel",
+  "signout.close",
+  "department.manage",
+  "location.manage",
+  "category.manage",
+  "audit.view",
+  "export.create",
+  "file.upload",
+]
+
+# Department lead — sign-outs and returns for their dept.
+[roles.dept_lead]
+description = "Department lead: sign-outs and returns for their department."
+permissions = [
+  "item.view",
+  "item.damage",
+  "item.lose",
+  "signout.view",
+  "signout.create",
+  "signout.confirm",
+  "signout.return",
+  "signout.cancel",
+  "signout.close",
+  "file.upload",
+  "audit.view",
+  "export.create",
+]
+
+# Volunteer — look up items and run sign-outs.
+[roles.volunteer]
+description = "Look up items and run sign-outs."
+permissions = [
+  "item.view",
+  "signout.view",
+  "signout.create",
+  "signout.return",
+]
+
+# Read-only across inventory and sign-outs.
+[roles.readonly]
+description = "Read-only view of inventory, sign-outs and the audit log."
+permissions = [
+  "item.view",
+  "signout.view",
+  "audit.view",
+]
+
+# ConOps front desk — log and resolve Lost & Found only.
+[roles.frontdesk]
+description = "ConOps front desk: log and resolve Lost & Found."
+permissions = [
+  "lostfound.view",
+  "lostfound.create",
+  "lostfound.resolve",
+  "file.upload",
+]
+
+# ConOps lead — full L&F plus reopen, delete, audit, exports.
+[roles.conops_lead]
+description = "Full Lost & Found plus reopen, delete, audit and exports."
+permissions = [
+  "lostfound.view",
+  "lostfound.create",
+  "lostfound.edit",
+  "lostfound.resolve",
+  "lostfound.reopen",
+  "lostfound.delete",
+  "audit.view",
+  "export.create",
+  "file.upload",
+]
+
+# ConOps observer — view Lost & Found reports only, no write actions.
+[roles.conops_readonly]
+description = "View Lost & Found reports only."
+permissions = [
+  "lostfound.view",
+]
+
+# ── OIDC bindings ────────────────────────────────────────────────────────────
+# "group" must match the Keycloak client role name (groups or roles JWT claim).
+
+[[bindings]]
+group = "stash-admin"              # → admin
+role = "admin"
+
+[[bindings]]
+group = "stash-logistics-lead"     # → inventory_manager
+role = "inventory_manager"
+
+[[bindings]]
+group = "stash-conops-lead"        # → conops_lead
+role = "conops_lead"
+
+[[bindings]]
+group = "stash-conops"             # → frontdesk
+role = "frontdesk"
+
+[[bindings]]
+group = "stash-conops-readonly"    # → conops_readonly
+role = "conops_readonly"
+
+[[bindings]]
+group = "stash-readonly"           # → readonly
+role = "readonly"
+
+[[bindings]]
+group = "stash-volunteer"          # → volunteer
+role = "volunteer"
+
+[[bindings]]
+group = "stash-dept-lead"          # → dept_lead (all departments)
+role = "dept_lead"
+
+# Scope to one department (optional):
+# [[bindings]]
+# group = "stash-dept-foo"
+# role = "dept_lead"
+# department_id = "00000000-0000-0000-0000-000000000000"

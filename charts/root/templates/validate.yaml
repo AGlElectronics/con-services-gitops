@@ -1,0 +1,53 @@
+{{- /*
+Stops rendering with a readable message while cluster.yaml is incomplete.
+Renders nothing.
+*/ -}}
+{{- $v := .Values }}
+{{- $required := dict
+  "domain" $v.domain
+  "git.repoURL" $v.git.repoURL
+  "acme.email" $v.acme.email
+  "s3.endpoint" $v.s3.endpoint
+  "s3.region" $v.s3.region
+  "s3.bucketPrefix" $v.s3.bucketPrefix
+  "den.backupAgeRecipients" $v.den.backupAgeRecipients
+}}
+{{- $missing := list }}
+{{- range $key := keys $required | sortAlpha }}
+{{- $val := index $required $key | toString }}
+{{- if or (eq $val "") (contains "change-me" $val) }}{{ $missing = append $missing $key }}{{ end }}
+{{- end }}
+{{- if or (empty $v.s3.fqdns) (has "change-me" $v.s3.fqdns) }}{{ $missing = append $missing "s3.fqdns" }}{{ end }}
+{{- if $missing }}
+{{- fail (printf "\n\ncluster.yaml is not complete. Set these values (they are still \"change-me\" or empty):\n  - %s\n\nRun `grep -n change-me cluster.yaml` to find them. Reference: https://aglelectronics.github.io/con-services/deploy/argocd/#clusteryaml-reference\n" (join "\n  - " $missing)) }}
+{{- end }}
+
+{{- if not (hasPrefix "age1" $v.den.backupAgeRecipients) }}
+{{- fail "\n\ncluster.yaml: den.backupAgeRecipients must be an age public key starting with \"age1\" (from `age-keygen`). Several keys: separate them with commas.\n" }}
+{{- end }}
+{{- if not (hasPrefix "https://" $v.s3.endpoint) }}
+{{- fail (printf "\n\ncluster.yaml: s3.endpoint must start with https:// (got %q).\n" $v.s3.endpoint) }}
+{{- end }}
+{{- if and $v.s3.backup.endpoint (not (hasPrefix "https://" $v.s3.backup.endpoint)) }}
+{{- fail (printf "\n\ncluster.yaml: s3.backup.endpoint must start with https:// (got %q).\n" $v.s3.backup.endpoint) }}
+{{- end }}
+{{- if and $v.s3.backup.endpoint (ne $v.s3.backup.endpoint $v.s3.endpoint) (empty $v.s3.backup.fqdns) }}
+{{- fail "\n\ncluster.yaml: s3.backup.endpoint differs from s3.endpoint, so set s3.backup.fqdns to its DNS name(s); otherwise the network policies block the backups.\n" }}
+{{- end }}
+
+{{- if $v.loadBalancer.ciliumL2.enabled }}
+{{- if empty $v.loadBalancer.ciliumL2.blocks }}
+{{- fail "\n\ncluster.yaml: loadBalancer.ciliumL2.enabled is true, so set loadBalancer.ciliumL2.blocks to the free addresses of your network (for example [\"192.0.2.240/29\"]).\n" }}
+{{- end }}
+{{- if or (not $v.gateway.public.loadBalancerIP) (not $v.gateway.internal.loadBalancerIP) }}
+{{- fail "\n\ncluster.yaml: loadBalancer.ciliumL2.enabled is true, so set gateway.public.loadBalancerIP and gateway.internal.loadBalancerIP to two addresses inside loadBalancer.ciliumL2.blocks. Your router forwards ports 80 and 443 to the public one.\n" }}
+{{- end }}
+{{- end }}
+
+{{- if and (eq $v.acme.dns01.provider "custom") (empty $v.acme.dns01.solvers) }}
+{{- fail "\n\ncluster.yaml: acme.dns01.provider is \"custom\", so set acme.dns01.solvers (cert-manager ClusterIssuer solvers).\n" }}
+{{- end }}
+
+{{- if and $v.arc.enabled (contains "your-org" $v.arc.githubConfigUrl) }}
+{{- fail "\n\ncluster.yaml: arc.enabled is true, so set arc.githubConfigUrl to your GitHub organisation (https://github.com/<org>).\n" }}
+{{- end }}

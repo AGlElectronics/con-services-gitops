@@ -1,0 +1,125 @@
+# Argo CD v3.6.1 (chart argo/argo-cd 10.14.0): HA settings and resources.
+# Nothing here is specific to one installation.
+#
+# First install (by hand, before the root Application):
+#
+#   helm repo add argo https://argoproj.github.io/argo-helm
+#   helm install argocd argo/argo-cd --version 10.14.0 -n argocd --create-namespace \
+#     -f bootstrap/argocd/values.yaml
+#
+# Afterwards, with argocd.selfManage: true in cluster.yaml (the default), the
+# root chart's "argocd" Application manages Argo CD with this file plus the
+# values computed from cluster.yaml (hostname, certificate, route) and
+# argocd.values.
+# Guide: https://aglelectronics.github.io/con-services/deploy/argocd/
+
+configs:
+  params:
+    # argocd-server serves TLS itself; the Gateway re-encrypts to it.
+    server.insecure: false
+  cm:
+    # Argo CD has no built-in health check for Application objects. Without
+    # this one the root Application would not wait for a child Application
+    # to become Healthy before starting the next sync wave.
+    resource.customizations.health.argoproj.io_Application: |
+      hs = {}
+      hs.status = "Progressing"
+      hs.message = ""
+      if obj.status ~= nil then
+        if obj.status.health ~= nil then
+          hs.status = obj.status.health.status
+          if obj.status.health.message ~= nil then
+            hs.message = obj.status.health.message
+          end
+        end
+      end
+      return hs
+    # The chart's default resource.exclusions already hide Cilium's
+    # high-churn objects (CiliumIdentity, CiliumEndpoint,
+    # CiliumEndpointSlice), Leases, EndpointSlices and CertificateRequests;
+    # add more here if needed.
+    resourceExclusionsAdditional: []
+
+# Sign-in through Keycloak (OIDC) is configured later directly in argocd-cm;
+# Dex is not needed.
+dex:
+  enabled: false
+
+# The application controller is a single active replica; for many clusters
+# or thousands of Applications, shard it (controller.replicas > 1 with
+# ARGOCD_CONTROLLER_REPLICAS) instead.
+controller:
+  replicas: 1
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "2", memory: 2Gi}
+
+server:
+  replicas: 2
+  pdb:
+    enabled: true
+    minAvailable: 1
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {cpu: 500m, memory: 512Mi}
+
+repoServer:
+  replicas: 2
+  pdb:
+    enabled: true
+    minAvailable: 1
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: "1", memory: 1Gi}
+  copyutil:
+    resources:
+      requests: {cpu: 10m, memory: 32Mi}
+      limits: {cpu: 100m, memory: 128Mi}
+
+applicationSet:
+  replicas: 2
+  pdb:
+    enabled: true
+    minAvailable: 1
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {cpu: 250m, memory: 256Mi}
+
+notifications:
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {cpu: 250m, memory: 256Mi}
+
+redisSecretInit:
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {cpu: 100m, memory: 128Mi}
+
+# Redis with Sentinel (3 Redis pods, 3 HAProxy pods). Its pods must run on
+# separate nodes, so it needs 3 schedulable nodes.
+redis-ha:
+  enabled: true
+  redis:
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {cpu: 500m, memory: 512Mi}
+  sentinel:
+    resources:
+      requests: {cpu: 10m, memory: 32Mi}
+      limits: {cpu: 100m, memory: 128Mi}
+  splitBrainDetection:
+    resources:
+      requests: {cpu: 10m, memory: 32Mi}
+      limits: {cpu: 100m, memory: 128Mi}
+  init:
+    resources:
+      requests: {cpu: 10m, memory: 32Mi}
+      limits: {cpu: 100m, memory: 128Mi}
+  haproxy:
+    resources:
+      requests: {cpu: 25m, memory: 64Mi}
+      limits: {cpu: 250m, memory: 256Mi}
+    init:
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+        limits: {cpu: 100m, memory: 128Mi}

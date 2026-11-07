@@ -1,0 +1,38 @@
+# cert-manager v1.21.3 (chart jetstack/cert-manager v1.21.3): fixed settings.
+# Replicas, resources and the DNS-01 resolvers come from cluster.yaml
+# (certManager.*, acme.recursiveNameservers) through the root chart.
+
+crds:
+  enabled: true
+  # Keep the CRDs (and so every Certificate) if the Application is deleted.
+  keep: true
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/instance: cert-manager
+        app.kubernetes.io/component: controller
+
+webhook:
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+cainjector:
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+# Check DNS-01 TXT records only against the resolvers above, not the
+# cluster's DNS (which may know a split-horizon answer).
+dns01RecursiveNameserversOnly: true
+
+# Turn on when a Prometheus Operator is installed.
+prometheus:
+  enabled: false

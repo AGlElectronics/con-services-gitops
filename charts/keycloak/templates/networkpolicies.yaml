@@ -1,0 +1,141 @@
+# Network policies for conservices-identity (on top of the default deny and
+# DNS rule from components/platform-namespaces).
+# Docs: https://aglelectronics.github.io/con-services/operations/network-policies/
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak
+  namespace: conservices-identity
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
+      app.kubernetes.io/instance: keycloak
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # OIDC discovery, token checks and the admin API from Den and the module
+    # backends (they reach keycloak-public via auth.<domain>, or keycloak:8443).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              conservices.io/tier: module
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: conservices-den
+      ports:
+        - { protocol: TCP, port: 8443 }
+    # The operator checks the server and the management interface.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: keycloak-operator
+      ports:
+        - { protocol: TCP, port: 8443 }
+        - { protocol: TCP, port: 9000 }
+    # Infinispan cluster traffic between the instances (JGroups 7800,
+    # failure detection 57800).
+    - from:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+              app.kubernetes.io/instance: keycloak
+      ports:
+        - { protocol: TCP, port: 7800 }
+        - { protocol: TCP, port: 57800 }
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+              app.kubernetes.io/instance: keycloak
+      ports:
+        - { protocol: TCP, port: 7800 }
+        - { protocol: TCP, port: 57800 }
+    # Outgoing mail (password reset, onboarding emails). Narrow the ipBlock
+    # to your SMTP relay's address in the cluster overlay if you can.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - { protocol: TCP, port: 587 }
+        - { protocol: TCP, port: 465 }
+---
+# Every pod of the namespace may reach PostgreSQL: Keycloak itself and the
+# Jobs the operator starts for realm imports and updates (their labels are
+# not stable across operator versions).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-egress
+  namespace: conservices-identity
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: conservices-data
+          podSelector:
+            matchLabels:
+              cnpg.io/cluster: conservices-pg
+      ports:
+        - { protocol: TCP, port: 5432 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak-operator
+  namespace: conservices-identity
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak-operator
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+              app.kubernetes.io/instance: keycloak
+      ports:
+        - { protocol: TCP, port: 8443 }
+        - { protocol: TCP, port: 9000 }
+---
+# Cilium-specific: the public Gateway (Envoy, identity "ingress") reaches
+# Keycloak, and the operator reaches the Kubernetes API.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: keycloak-gateway
+  namespace: conservices-identity
+spec:
+  endpointSelector:
+    matchLabels:
+      app: keycloak
+      app.kubernetes.io/instance: keycloak
+  ingress:
+    - fromEntities:
+        - ingress
+      toPorts:
+        - ports:
+            - port: "8443"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: keycloak-operator-apiserver
+  namespace: conservices-identity
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak-operator
+  egress:
+    - toEntities:
+        - kube-apiserver

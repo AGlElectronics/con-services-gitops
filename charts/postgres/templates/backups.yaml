@@ -1,0 +1,99 @@
+# Backups with the Barman Cloud plugin: continuous WAL archiving plus a
+# daily base backup. Together they allow point-in-time recovery to any
+# second of the retention window.
+# Target: <bucketPrefix>-pg-backups at the backup S3 endpoint, ideally in
+# another region or at another provider, with its own key
+# (kv/conservices/postgres/backup-s3).
+# Docs: https://aglelectronics.github.io/con-services/deploy/data/#backups
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: conservices-pg-backups
+  namespace: conservices-data
+spec:
+  retentionPolicy: {{ .Values.backup.retention }}
+  instanceSidecarConfiguration:
+    resources:
+      {{- toYaml .Values.backup.sidecarResources | nindent 6 }}
+    # boto3 1.36+ sends new integrity checksums by default, which several
+    # S3-compatible services reject. Only send them when required; AWS S3
+    # works either way.
+    env:
+      - name: AWS_REQUEST_CHECKSUM_CALCULATION
+        value: when_required
+      - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+        value: when_required
+  configuration:
+    destinationPath: s3://{{ .Values.backup.bucket }}/
+    endpointURL: {{ .Values.backup.endpoint }}
+    s3Credentials:
+      accessKeyId:
+        name: cnpg-backups-s3
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: cnpg-backups-s3
+        key: ACCESS_SECRET_KEY
+      region:
+        name: cnpg-backups-s3
+        key: REGION
+    wal:
+      compression: gzip
+      maxParallel: 4
+    data:
+      compression: gzip
+      jobs: 2
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: conservices-pg-daily
+  namespace: conservices-data
+spec:
+  # Six fields, seconds first.
+  schedule: {{ .Values.backup.schedule | quote }}
+  # Take the first backup right away, so point-in-time recovery works from day one.
+  immediate: true
+  backupOwnerReference: self
+  cluster:
+    name: conservices-pg
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+---
+# WAL archive and base backups go to the backup S3 endpoint on port 443,
+# allowed by DNS name. Cilium learns the addresses from the DNS answers (the
+# DNS rule sends lookups through its DNS proxy), so provider IP changes need
+# no edit.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: conservices-pg-s3
+  namespace: conservices-data
+spec:
+  endpointSelector:
+    matchLabels:
+      conservices.io/postgres: "true"
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchPattern: "*"
+    - toFQDNs:
+        {{- range .Values.backup.fqdns }}
+        {{- if contains "*" . }}
+        - matchPattern: {{ . | quote }}
+        {{- else }}
+        - matchName: {{ . | quote }}
+        {{- end }}
+        {{- end }}
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

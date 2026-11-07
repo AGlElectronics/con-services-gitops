@@ -1,0 +1,48 @@
+# The Keycloak Operator (CRDs, RBAC, Deployment) from the upstream
+# keycloak-k8s-resources repository, pinned to a release tag. It watches its
+# own namespace only (conservices-identity) and runs Keycloak 26.8.2.
+#
+# Upgrading: change the ref below (operator and Keycloak move together),
+# read https://www.keycloak.org/docs/latest/upgrading/ first.
+# Docs: https://aglelectronics.github.io/con-services/deploy/identity/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - https://github.com/keycloak/keycloak-k8s-resources//kubernetes?ref=26.8.2
+
+# Like upstream: also move the ServiceAccount subjects of the
+# (Cluster)RoleBindings into our namespace.
+transformers:
+  - |-
+    apiVersion: builtin
+    kind: NamespaceTransformer
+    metadata:
+      name: conservices-identity
+      namespace: conservices-identity
+    setRoleBindingSubjects: allServiceAccounts
+    fieldSpecs:
+      - path: metadata/namespace
+        create: true
+
+patches:
+  # Pod security "restricted" and no image pull on every restart.
+  - target:
+      kind: Deployment
+      name: keycloak-operator
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+      - op: add
+        path: /spec/template/spec/securityContext
+        value:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+      - op: add
+        path: /spec/template/spec/containers/0/securityContext
+        value:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
