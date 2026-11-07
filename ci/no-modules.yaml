@@ -1,0 +1,11 @@
+# Laid over examples/cluster.example-filled.yaml by CI: an installation
+# with Den only. Zero modules must render and pass every check.
+modules:
+  stash: { enabled: false }
+  hr: { enabled: false }
+  rally: { enabled: false }
+  finance: { enabled: false }
+  learn: { enabled: false }
+  wiki: { enabled: false }
+  desk: { enabled: false }
+  tasks: { enabled: false }

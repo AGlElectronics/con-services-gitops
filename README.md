@@ -25,6 +25,12 @@ service, a domain, and `kubectl`, `helm` and `git` on your computer.
     helm template root charts/root -f cluster.yaml > /dev/null && echo OK
     ```
 
+    Then pick the modules to run: under `modules:` set `enabled: true`
+    for each one you want (all are off by default; Den is always
+    installed). Each module shows up unpaired on Den's **Modules** page
+    and waits for Den until you pair it there
+    ([Deploy the apps](https://aglelectronics.github.io/con-services/deploy/apps/)).
+
 3. **Install Argo CD** with the template's values (pinned chart version):
 
     ```sh

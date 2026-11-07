@@ -2,7 +2,8 @@
 #
 # 1. Replace every "change-me" below. `grep -n change-me cluster.yaml`
 #    printing nothing means you are done.
-# 2. Commit and push, then run bootstrap/install-root.sh.
+# 2. Set enabled: true for the modules you want (section "modules" below).
+# 3. Commit and push, then run bootstrap/install-root.sh.
 #
 # Every other setting has a production default in charts/root/values.yaml.
 # To change one, copy its key here (same nesting) and set your value; this
@@ -42,6 +43,18 @@ den:
   # and copy the "Public key: age1..." line. Keep den-backup.key offline.
   backupAgeRecipients: change-me
 
+# Pick the modules to run (Den is always deployed). Each module waits for Den
+# until you pair it from the Den dashboard.
+modules:
+  stash:   { enabled: false }   # inventory, sign-outs, Lost & Found
+  hr:      { enabled: false }   # people, departments, onboarding
+  rally:   { enabled: false }   # events and schedule (events.<domain>)
+  finance: { enabled: false }   # invoices and money tracking
+  learn:   { enabled: false }   # training courses and quizzes
+  wiki:    { enabled: false }   # pages in private and team spaces
+  desk:    { enabled: false }   # shared support inboxes
+  tasks:   { enabled: false }   # projects, task lists and boards
+
 # --- Optional (uncomment to change a default) -------------------------------
 
 # Follow another branch or tag of your copy:
@@ -58,11 +71,6 @@ den:
 #     endpoint: https://s3.other-region.example-provider.com
 #     region: other-region
 #     fqdns: ["s3.other-region.example-provider.com"]
-
-# Turn modules off (on by default: stash hr rally finance learn wiki desk tasks):
-# modules:
-#   finance:
-#     enabled: false
 
 # Let this template hand out the Gateway IPs with Cilium LB IPAM and L2
 # announcements (needs Cilium's l2announcements.enabled):

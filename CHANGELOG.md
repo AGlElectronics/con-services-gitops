@@ -8,7 +8,37 @@ and the repository uses [Semantic Versioning](https://semver.org/).
 
 First version of the template.
 
+### Changed
+
+- **BREAKING:** modules are now opt-in. Every `modules.<name>.enabled`
+  defaults to `false`, and only Den is deployed until you enable modules.
+  What to do: in `cluster.yaml`, under *Pick the modules to run*, set
+  `enabled: true` for every module you want to keep. A module you leave at
+  `false` has its Application deleted on the next sync; its database and
+  bucket are kept.
+- `cluster.yaml` lists all eight modules in a visible block (*Pick the
+  modules to run*) instead of a commented-out example. Zero enabled modules
+  is a valid installation.
+- `charts.targetRevision` defaults to `v1.1.0`: the Den and module charts
+  of that release are needed for the two settings below.
+
 ### Added
+
+- Every module Application sets `den.mode: required`: until a module is
+  paired with Den, it shows *Waiting for Den* and its API answers
+  `503 den_pairing_required`. There is no standalone option; the root chart
+  stops when `modules.<name>.values.den.mode` tries to change it.
+- Den's Application sets `preregisterModules` from the enabled modules
+  (slug, display name and `https://<host>.<domain>`; Rally is `events`), so
+  Den lists them as unpaired on its Modules page and an admin only clicks
+  **Pair**.
+- CI: `ci/check.py` asserts that every module Application has
+  `den.mode: required` (and `DEN_MODE=required` in its rendered ConfigMap)
+  and that Den's `preregisterModules` lists exactly the enabled modules. The
+  workflow also renders and checks an installation with Den only
+  (`ci/no-modules.yaml`); `ci/render.py` accepts several `--values` files.
+- `examples/cluster.example-filled.yaml` enables Stash, HR, Rally, Wiki and
+  Tasks.
 
 - One settings file, `cluster.yaml`: domain, Git repository, Let's Encrypt,
   S3 service, modules, network and sizing. It is the only file an operator

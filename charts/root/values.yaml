@@ -83,31 +83,34 @@ images:
 # Where the Den and module Helm charts come from.
 charts:
   repoURL: https://github.com/AGlElectronics/con-services.git
-  targetRevision: v1.0.0
+  targetRevision: v1.1.0
 
 # --- Modules ----------------------------------------------------------------
+# Opt-in: no module is installed until you enable it in cluster.yaml. Den is
+# always installed. Every enabled module is listed on Den's Modules page as
+# unpaired and waits for Den (den.mode: required) until you pair it there.
 # enabled:      install the module.
 # imageTag:     empty = images.tag.
 # accessConfig: the module's access configuration (TOML). Empty = the file
 #               charts/module-extras/files/access-config/<module>.toml.
 # values:       extra values for the module chart, merged last (replicas,
-#               resources, config.* settings).
+#               resources, config.* settings). den.mode cannot be changed.
 
 modules:
-  stash:   { enabled: true, imageTag: "", accessConfig: "", values: {} }
-  hr:      { enabled: true, imageTag: "", values: {} }
+  stash:   { enabled: false, imageTag: "", accessConfig: "", values: {} }
+  hr:      { enabled: false, imageTag: "", values: {} }
   rally:
-    enabled: true
+    enabled: false
     imageTag: ""
     accessConfig: ""
     # Public submission site on submit.<domain>. Needs an image.
     submit: { enabled: false }
     values: {}
-  finance: { enabled: true, imageTag: "", values: {} }
-  learn:   { enabled: true, imageTag: "", accessConfig: "", values: {} }
-  wiki:    { enabled: true, imageTag: "", accessConfig: "", values: {} }
-  desk:    { enabled: true, imageTag: "", accessConfig: "", values: {} }
-  tasks:   { enabled: true, imageTag: "", accessConfig: "", values: {} }
+  finance: { enabled: false, imageTag: "", values: {} }
+  learn:   { enabled: false, imageTag: "", accessConfig: "", values: {} }
+  wiki:    { enabled: false, imageTag: "", accessConfig: "", values: {} }
+  desk:    { enabled: false, imageTag: "", accessConfig: "", values: {} }
+  tasks:   { enabled: false, imageTag: "", accessConfig: "", values: {} }
 
 # Sender address of Learn's mail. Empty: no-reply@<domain>.
 smtp:

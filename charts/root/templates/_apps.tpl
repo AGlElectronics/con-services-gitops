@@ -66,8 +66,11 @@ S3_USE_PATH_STYLE: {{ .s3.pathStyle | quote }}
 {{- $tag := $v.den.imageTag | default $v.images.tag }}
 {{- $meta := include "root.moduleMeta" . | fromYaml }}
 {{- $buckets := list (printf "%s-conservices-den" $s3.prefix) }}
+{{- $prereg := list }}
 {{- range $n := fromJsonArray (include "root.enabledModules" .) }}
-{{- if (index $meta $n).s3 }}{{ $buckets = append $buckets (printf "%s-conservices-%s" $s3.prefix $n) }}{{ end }}
+{{- $mm := index $meta $n }}
+{{- if $mm.s3 }}{{ $buckets = append $buckets (printf "%s-conservices-%s" $s3.prefix $n) }}{{ end }}
+{{- $prereg = append $prereg (dict "slug" $mm.slug "display_name" $mm.title "base_url" (printf "https://%s.%s" $mm.host $d)) }}
 {{- end }}
 image:
   backend: { tag: {{ $tag | quote }} }
@@ -86,6 +89,10 @@ config:
   CORS_ALLOWED_ORIGINS: https://den.{{ $d }}
   KEYCLOAK_ADMIN_URL: https://keycloak.conservices-identity.svc.cluster.local:8443
   {{- include "root.appS3Config" (dict "s3" $s3 "bucket" (printf "%s-conservices-den" $s3.prefix)) | nindent 2 }}
+# The enabled modules, listed unpaired on Den's Modules page from the first
+# start (DEN_PREREGISTER_MODULES). Den adds new slugs and never changes or
+# removes existing ones.
+preregisterModules: {{ toJson $prereg }}
 operator:
   existingSecret: den-operator-secrets
 operatorConfig:
@@ -128,6 +135,9 @@ image:
   migrate: { tag: {{ $tag | quote }} }
   {{- end }}
 existingSecret: {{ $n }}-secrets
+# The module waits for Den (503 den_pairing_required) until it is paired.
+den:
+  mode: required
 {{- if $meta.access }}
 accessConfig:
   enabled: true

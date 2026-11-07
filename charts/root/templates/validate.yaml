@@ -48,6 +48,13 @@ Renders nothing.
 {{- fail "\n\ncluster.yaml: acme.dns01.provider is \"custom\", so set acme.dns01.solvers (cert-manager ClusterIssuer solvers).\n" }}
 {{- end }}
 
+{{- range $n, $m := $v.modules }}
+{{- $mode := ((($m.values | default dict).den | default dict).mode | default "required") }}
+{{- if ne (toString $mode) "required" }}
+{{- fail (printf "\n\ncluster.yaml: modules.%s.values.den.mode cannot be changed. Every module in this template waits for Den until you pair it from Den's Modules page.\n" $n) }}
+{{- end }}
+{{- end }}
+
 {{- if and $v.arc.enabled (contains "your-org" $v.arc.githubConfigUrl) }}
 {{- fail "\n\ncluster.yaml: arc.enabled is true, so set arc.githubConfigUrl to your GitHub organisation (https://github.com/<org>).\n" }}
 {{- end }}

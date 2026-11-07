@@ -14,6 +14,9 @@ Needs helm and kubectl on PATH, and PyYAML.
 
   python3 ci/render.py --values examples/cluster.example-filled.yaml \
       --main-repo ../con-services --out build/rendered
+
+--values may be repeated (later files win, as with helm -f), for example
+with ci/no-modules.yaml for an installation with Den only.
 """
 
 import argparse
@@ -80,7 +83,8 @@ def kustomize(path, patches, tmp, name):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--values", required=True)
+    ap.add_argument("--values", required=True, action="append",
+                    help="cluster.yaml to render; repeat to lay files over each other")
     ap.add_argument("--main-repo", required=True, help="checkout of AGlElectronics/con-services")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
@@ -88,9 +92,14 @@ def main():
     out = pathlib.Path(args.out)
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
-    root = run(["helm", "template", "root", str(REPO / "charts/root"), "-f", args.values])
+    cmd = ["helm", "template", "root", str(REPO / "charts/root")]
+    for f in args.values:
+        cmd += ["-f", f]
+    root = run(cmd)
     (out / "root.yaml").write_text(root, encoding="utf-8")
-    cluster = yaml.safe_load(open(args.values, encoding="utf-8"))
+    cluster = {}
+    for f in args.values:
+        cluster.update(yaml.safe_load(open(f, encoding="utf-8")) or {})
     main_repo_url = None
     apps = [d for d in yaml.safe_load_all(root) if d and d.get("kind") == "Application"]
 

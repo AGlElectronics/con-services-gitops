@@ -4,18 +4,19 @@ stash hr rally finance learn wiki desk tasks
 {{- end }}
 
 {{/*
-Per module: host prefix, PostgreSQL role, whether it stores files in S3,
-has a migrate image, reads an access configuration.
+Per module: host prefix, PostgreSQL role, Den's module slug and display
+name, whether it stores files in S3, has a migrate image, reads an access
+configuration.
 */}}
 {{- define "root.moduleMeta" -}}
-stash:   { host: stash,   role: stash,   label: stash,   s3: true,  migrate: false, access: true }
-hr:      { host: hr,      role: hr,      label: hr,      s3: false, migrate: true,  access: false }
-rally:   { host: events,  role: events,  label: events,  s3: true,  migrate: true,  access: true }
-finance: { host: finance, role: finance, label: finance, s3: false, migrate: true,  access: false }
-learn:   { host: learn,   role: learn,   label: learn,   s3: true,  migrate: true,  access: true }
-wiki:    { host: wiki,    role: wiki,    label: wiki,    s3: true,  migrate: true,  access: true }
-desk:    { host: desk,    role: desk,    label: desk,    s3: false, migrate: true,  access: true }
-tasks:   { host: tasks,   role: tasks,   label: tasks,   s3: true,  migrate: true,  access: true }
+stash:   { host: stash,   role: stash,   label: stash,   slug: stash,   title: Stash,   s3: true,  migrate: false, access: true }
+hr:      { host: hr,      role: hr,      label: hr,      slug: hr,      title: HR,      s3: false, migrate: true,  access: false }
+rally:   { host: events,  role: events,  label: events,  slug: events,  title: Rally,   s3: true,  migrate: true,  access: true }
+finance: { host: finance, role: finance, label: finance, slug: finance, title: Finance, s3: false, migrate: true,  access: false }
+learn:   { host: learn,   role: learn,   label: learn,   slug: learn,   title: Learn,   s3: true,  migrate: true,  access: true }
+wiki:    { host: wiki,    role: wiki,    label: wiki,    slug: wiki,    title: Wiki,    s3: true,  migrate: true,  access: true }
+desk:    { host: desk,    role: desk,    label: desk,    slug: desk,    title: Desk,    s3: false, migrate: true,  access: true }
+tasks:   { host: tasks,   role: tasks,   label: tasks,   slug: tasks,   title: Tasks,   s3: true,  migrate: true,  access: true }
 {{- end }}
 
 {{/* Names of the enabled modules as a JSON list; use with fromJsonArray. */}}

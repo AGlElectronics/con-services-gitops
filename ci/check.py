@@ -6,11 +6,15 @@
   - CloudNativePG Clusters, Keycloak instances and the Barman Cloud sidecar
     have requests and limits too;
   - every image has a pinned tag or digest, never "latest";
+  - every module Application sets den.mode "required" and its backend
+    ConfigMap carries DEN_MODE=required; Den's preregisterModules (and its
+    DEN_PREREGISTER_MODULES) list exactly the enabled modules;
   - prints a sizing table (replicas x requests and limits, PVC sizes).
 
   python3 ci/check.py build/rendered [--sizing]
 """
 
+import json
 import pathlib
 import sys
 
@@ -93,10 +97,67 @@ def walk(node, obj, where, app):
             walk(v, obj, where, app)
 
 
+DEN_SLUGS = {"rally": "events"}
+
+
+def rendered(out, name):
+    """Objects of every source of Application <name>."""
+    objs = []
+    for f in sorted(out.glob(f"{name}--*.yaml")):
+        objs += [o for o in yaml.safe_load_all(f.read_text(encoding="utf-8")) if o]
+    return objs
+
+
+def check_den_pairing(out):
+    """Modules wait for Den, and Den lists exactly the enabled modules."""
+    apps = {a["metadata"]["name"]: a for a in yaml.safe_load_all((out / "root.yaml").read_text(encoding="utf-8"))
+            if a and a.get("kind") == "Application"}
+    if "den" not in apps:
+        errors.append("root: no Application den (Den is always deployed)")
+        return 0
+    modules = sorted(n for n, a in apps.items()
+                     if (a["metadata"].get("labels") or {}).get("conservices.io/module") and n != "den")
+
+    def values_of(app):
+        return app["spec"]["sources"][0]["helm"]["valuesObject"]
+
+    expected = []
+    for n in modules:
+        vals = values_of(apps[n])
+        mode = (vals.get("den") or {}).get("mode")
+        if mode != "required":
+            errors.append(f"{n}: Application values den.mode is {mode!r}, want 'required'")
+        cms = [o for o in rendered(out, n) if o.get("kind") == "ConfigMap"
+               and o["metadata"]["name"] == f"{n}-config"]
+        if not cms or (cms[0].get("data") or {}).get("DEN_MODE") != "required":
+            errors.append(f"{n}: ConfigMap {n}-config has no DEN_MODE=required")
+        expected.append({"slug": DEN_SLUGS.get(n, n), "base_url": f"https://{vals['route']['host']}"})
+
+    prereg = values_of(apps["den"]).get("preregisterModules")
+    if prereg is None:
+        errors.append("den: Application values have no preregisterModules")
+        return len(modules)
+    got = sorted(({"slug": m.get("slug"), "base_url": m.get("base_url")} for m in prereg), key=lambda m: m["slug"])
+    want = sorted(expected, key=lambda m: m["slug"])
+    if got != want:
+        errors.append(f"den: preregisterModules {got} do not match the enabled modules {want}")
+    for m in prereg:
+        if not m.get("display_name"):
+            errors.append(f"den: preregisterModules entry {m.get('slug')!r} has no display_name")
+    den_cm = [o for o in rendered(out, "den") if o.get("kind") == "ConfigMap" and o["metadata"]["name"] == "den-config"]
+    raw = ((den_cm[0].get("data") or {}) if den_cm else {}).get("DEN_PREREGISTER_MODULES")
+    if prereg and (raw is None or json.loads(raw) != prereg):
+        errors.append("den: ConfigMap den-config DEN_PREREGISTER_MODULES does not match preregisterModules")
+    if not prereg and raw is not None:
+        errors.append("den: ConfigMap den-config sets DEN_PREREGISTER_MODULES with no module enabled")
+    return len(modules)
+
+
 def main():
     out = pathlib.Path(sys.argv[1])
     sizing = "--sizing" in sys.argv
     pvcs = []
+    module_count = check_den_pairing(out)
     for f in sorted(out.glob("*--*.yaml")):
         app = f.name.split("--")[0]
         for obj in yaml.safe_load_all(f.read_text(encoding="utf-8")):
@@ -164,6 +225,7 @@ def main():
         print(f"\n{len(set(errors))} problem(s)", file=sys.stderr)
         sys.exit(1)
     print(f"check: {len(rows)} containers with requests and limits, all images pinned")
+    print(f"check: {module_count} module(s), each with den.mode required and listed in Den's preregisterModules")
 
 
 if __name__ == "__main__":

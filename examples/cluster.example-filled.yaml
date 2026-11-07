@@ -53,9 +53,18 @@ images:
     enabled: true
 
 modules:
+  stash:
+    enabled: true
+  hr:
+    enabled: true
   rally:
+    enabled: true
     submit:
       enabled: false
+  wiki:
+    enabled: true
+  tasks:
+    enabled: true
 
 arc:
   enabled: true

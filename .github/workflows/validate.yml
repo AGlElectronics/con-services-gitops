@@ -91,9 +91,17 @@ jobs:
         working-directory: gitops
         run: python ci/render.py --values "$VALUES_FILE" --main-repo ../con-services --out build/rendered
 
-      - name: Resources and image tags
+      - name: Resources, image tags, modules wait for Den
         working-directory: gitops
         run: python ci/check.py build/rendered --sizing
+
+      - name: Den only (no module enabled)
+        working-directory: gitops
+        run: |
+          set -euo pipefail
+          python ci/render.py --values "$VALUES_FILE" --values ci/no-modules.yaml \
+            --main-repo ../con-services --out build/rendered-no-modules
+          python ci/check.py build/rendered-no-modules
 
       - name: Schemas (kubeconform, strict)
         working-directory: gitops
