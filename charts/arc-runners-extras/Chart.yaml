@@ -1,6 +1,0 @@
-apiVersion: v2
-name: arc-runners-extras
-description: >-
-  GitHub App ExternalSecret and network policy of the self-hosted runners. Values come from the root chart (cluster.yaml).
-type: application
-version: 1.0.0

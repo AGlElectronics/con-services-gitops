@@ -70,8 +70,6 @@ def replicas_of(obj):
         return "per node"
     if kind in ("Job", "CronJob"):
         return "job"
-    if kind == "AutoscalingRunnerSet":
-        return f"0-{spec.get('maxRunners', '?')}"
     return 1
 
 

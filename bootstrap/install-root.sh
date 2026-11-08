@@ -11,7 +11,7 @@
 # values still set to "change-me". Then the script checks the cluster
 # prerequisites the template uses but does not install (cert-manager,
 # trust-manager, External Secrets Operator, CloudNativePG with the Barman
-# Cloud plugin, and the OpenBao CA bundle); --skip-preflight skips that.
+# Cloud plugin, the OpenBao CA bundle); --skip-preflight skips that.
 # Guide: https://aglelectronics.github.io/con-services/deploy/argocd/
 set -euo pipefail
 
@@ -44,7 +44,7 @@ if ((DRY_RUN)); then
 fi
 
 kubectl get crd applications.argoproj.io >/dev/null 2>&1 \
-  || die "Argo CD is not installed in this cluster (see the guide, 'Install Argo CD')"
+  || die "Argo CD is not installed in this cluster (it is a prerequisite: https://aglelectronics.github.io/con-services/deploy/prerequisites/#9-argo-cd)"
 
 if ((PREFLIGHT)); then
   log "Checking the cluster prerequisites"

@@ -1,8 +1,8 @@
 {{- /*
 Admin UIs on the INTERNAL Gateway only. These names must resolve to the
 internal Gateway IP on your network (split DNS, local DNS records or a hosts
-file); see deploy/dns-and-certificates. Argo CD's route comes from its own
-chart, Keycloak's admin route from charts/keycloak.
+file); see deploy/dns-and-certificates. Keycloak's admin route comes from
+charts/keycloak.
 */ -}}
 {{- $d := .Values.domain }}
 {{- if .Values.adminRoutes.longhorn }}

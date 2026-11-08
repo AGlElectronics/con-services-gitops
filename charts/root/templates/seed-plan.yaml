@@ -24,7 +24,6 @@ how OpenBao is set up for this cluster.yaml and which entries it needs.
   "desk" (has "desk" $enabled)
   "smtp" $v.keycloak.smtp.enabled
   "cloudflare" (eq $v.acme.dns01.provider "cloudflare")
-  "githubArc" $v.arc.enabled
   "ghcr" $v.images.pullSecret.enabled
   "kvPath" $v.openbao.kvPath
   "authMount" $v.openbao.auth.mountPath

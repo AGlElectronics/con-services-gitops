@@ -48,9 +48,6 @@
 #                                              password   (keycloak.smtp.enabled)
 #   kv/infra/cloudflare                        api-token  (acme.dns01.provider
 #                                                          cloudflare)
-#   kv/infra/github-arc                        github_app_id,
-#                                              github_app_installation_id,
-#                                              github_app_private_key (arc.enabled)
 #   kv/infra/ghcr                              username, token
 #                                              (images.pullSecret.enabled)
 #
@@ -219,22 +216,6 @@ if flag cloudflare && ask infra/cloudflare "api-token" \
     log "$OPENBAO_KV/infra/cloudflare written"
   else
     MISSING+=("$OPENBAO_KV/infra/cloudflare (api-token)")
-  fi
-fi
-
-if flag githubArc && ask infra/github-arc "github_app_id, github_app_installation_id, github_app_private_key" \
-    "GitHub App the self-hosted Actions runners register with"; then
-  read -r -p "  GitHub App ID (empty = skip): " app_id
-  if [[ -n "$app_id" ]]; then
-    read -r -p "  Installation ID: " inst_id
-    read -r -p "  Path to the private key (.pem): " pem
-    [[ -r "$pem" ]] || die "cannot read $pem"
-    kv_put_json "$TOKEN" infra/github-arc "$(jq -n --arg a "$app_id" --arg i "$inst_id" \
-      --rawfile k "$pem" \
-      '{github_app_id: $a, github_app_installation_id: $i, github_app_private_key: $k}')"
-    log "$OPENBAO_KV/infra/github-arc written (you may now delete $pem)"
-  else
-    MISSING+=("$OPENBAO_KV/infra/github-arc (github_app_id, github_app_installation_id, github_app_private_key)")
   fi
 fi
 

@@ -1,5 +1,5 @@
 # Set by the root chart from cluster.yaml (domain, gateway.*, acme.issuer,
-# adminRoutes.*, argocd.selfManage).
+# adminRoutes.*).
 domain: example.org
 className: cilium
 issuer: letsencrypt-staging
@@ -12,4 +12,3 @@ internal:
 adminRoutes:
   longhorn: false
   hubble: false
-argocd: true

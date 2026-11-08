@@ -40,8 +40,6 @@ EXTRA = [
     for p in (
         "v2/ciliumnetworkpolicies.yaml",
         "v2/ciliumclusterwidenetworkpolicies.yaml",
-        "v2/ciliumloadbalancerippools.yaml",
-        "v2alpha1/ciliuml2announcementpolicies.yaml",
     )
 ]
 

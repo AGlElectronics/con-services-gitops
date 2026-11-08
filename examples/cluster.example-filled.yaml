@@ -27,18 +27,11 @@ s3:
 den:
   backupAgeRecipients: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
 
-loadBalancer:
-  ciliumL2:
-    enabled: true
-    blocks: ["192.0.2.240/29"]
 gateway:
   public:
     loadBalancerIP: 192.0.2.240
   internal:
     loadBalancerIP: 192.0.2.241
-
-oidcHairpin:
-  mode: coredns-custom
 
 storage:
   longhornSingle:
@@ -65,7 +58,3 @@ modules:
     enabled: true
   tasks:
     enabled: true
-
-arc:
-  enabled: true
-  githubConfigUrl: https://github.com/example-org

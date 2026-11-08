@@ -72,21 +72,12 @@ modules:
 #     region: other-region
 #     fqdns: ["s3.other-region.example-provider.com"]
 
-# Let this template hand out the Gateway IPs with Cilium LB IPAM and L2
-# announcements (needs Cilium's l2announcements.enabled):
-# loadBalancer:
-#   ciliumL2:
-#     enabled: true
-#     blocks: ["192.0.2.240/29"]
+# Fixed Gateway IPs from your cluster's Cilium LB IPAM pool:
 # gateway:
 #   public:
 #     loadBalancerIP: 192.0.2.240
 #   internal:
 #     loadBalancerIP: 192.0.2.241
-
-# k3s or AKS: let CoreDNS answer auth.<domain> with the in-cluster Keycloak:
-# oidcHairpin:
-#   mode: coredns-custom
 
 # Longhorn: create longhorn-single and use it for PostgreSQL:
 # storage:
@@ -103,8 +94,3 @@ modules:
 # externalSecrets:
 #   namespace: external-secrets
 #   serviceAccount: external-secrets
-
-# Self-hosted GitHub Actions runners:
-# arc:
-#   enabled: true
-#   githubConfigUrl: https://github.com/your-org

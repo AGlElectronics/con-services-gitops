@@ -36,6 +36,40 @@ First version of the template.
      `external-secrets`.
   5. Unseal with your own copy of `openbao-unseal.sh` (or the OpenBao CLI)
      from now on.
+- **BREAKING:** the template no longer manages Argo CD, LoadBalancer IPs,
+  cluster DNS or the Actions Runner Controller; like the components above,
+  they belong to the cluster. Removed: the `argocd`, `cilium-lb`,
+  `oidc-hairpin` and `arc-controller` Applications, `charts/cilium-lb`,
+  `charts/oidc-hairpin`, `values/arc-controller.yaml`, and the
+  `cluster.yaml` keys `argocd`, `loadBalancer`, `oidcHairpin` and
+  `arc.resources.controller`. The internal Gateway no longer accepts routes
+  from the `argocd` namespace. `gateway.*.loadBalancerIP` still requests a
+  fixed address from the cluster's Cilium LB IPAM pool.
+  What to do on an existing installation, **before** pulling this change:
+  1. Remove those keys from your `cluster.yaml` (the schema rejects them).
+  2. Keep the objects running under your own management. None of the four
+     Applications has a deletion finalizer, so Argo CD, the IP pool, the
+     CoreDNS ConfigMap and the ARC controller stay when the template drops
+     them. Keep managing Argo CD with `helm upgrade` and
+     `bootstrap/argocd/values.yaml`; export the IP pool and the CoreDNS
+     ConfigMap (`kubectl get ... -o yaml`) if you want them in your own
+     cluster repository.
+  3. To keep Argo CD's UI on `argocd.<domain>`, give it your own route
+     (for example the Argo CD chart's `server.httproute` on a Gateway of
+     your cluster).
+- **BREAKING:** the template no longer contains self-hosted GitHub Actions
+  runners or an example cluster; neither is part of Con Services. Removed:
+  the `arc-runners` Application, `charts/arc-runners-extras`,
+  `values/arc-runners.yaml`, the `cluster.yaml` block `arc`, the OpenBao
+  entry `kv/infra/github-arc` from `openbao-seed.sh`, and
+  `bootstrap/example-k3s/`.
+  What to do on an existing installation, **before** pulling this change:
+  1. Remove the `arc` block from your `cluster.yaml` (the schema rejects it).
+  2. With `arc.enabled`, the root Application deletes `arc-runners` and its
+     namespace's runner scale set on the next sync. To keep the runners,
+     first move them to your own Application or Helm release
+     (`gha-runner-scale-set` 0.15.1), then delete
+     `kv/infra/github-arc` from OpenBao once nothing reads it.
 - **BREAKING:** modules are now opt-in. Every `modules.<name>.enabled`
   defaults to `false`, and only Den is deployed until you enable modules.
   What to do: in `cluster.yaml`, under *Pick the modules to run*, set
@@ -47,6 +81,11 @@ First version of the template.
   is a valid installation.
 - `charts.targetRevision` defaults to `v1.1.0`: the Den and module charts
   of that release are needed for the two settings below.
+- The README and `bootstrap/` no longer show how to install Argo CD. Step 3
+  of the README checks that Argo CD runs with the Application health check;
+  `bootstrap/argocd/values.yaml` is reference values (the required health
+  check, plus optional HA settings), and `install-root.sh` points to the
+  Argo CD requirements when Argo CD is missing.
 
 ### Added
 
@@ -93,9 +132,9 @@ First version of the template.
 - Root Helm chart `charts/root` that renders every Argo CD Application from
   `cluster.yaml`, ordered by sync waves, plus the root Application itself.
   `bootstrap/install-root.sh` creates the root Application once.
-- Argo CD 3.6.1 (chart `argo-cd` 10.14.0) in HA mode with Redis HA, served
-  on the internal Gateway with a certificate from the internal CA, and
-  managing itself after the first install (`argocd.selfManage`).
+- Recommended Argo CD 3.6.1 values (chart `argo-cd` 10.14.0, HA mode with
+  Redis HA and the Application health check the sync waves need) in
+  `bootstrap/argocd/values.yaml`.
 - The Con Services internal CA (`ClusterIssuer/conservices-internal-ca`,
   `Bundle/conservices-internal-ca`) on the cluster's cert-manager and
   trust-manager.
@@ -103,12 +142,9 @@ First version of the template.
   with DNS-01 (Cloudflare, or your own cert-manager solvers in
   `acme.dns01.solvers`), and a wildcard certificate for the domain.
 - Gateways `public` (internet-facing, HTTP to HTTPS redirect) and
-  `internal` (admin UIs: Argo CD, Keycloak admin console, and optionally
-  Longhorn and Hubble) in the namespace `conservices-gateway`.
-- Optional Cilium LB IPAM pool and L2 announcement policy
-  (`loadBalancer.ciliumL2`), optional CoreDNS rewrite so pods reach
-  Keycloak's public address inside the cluster (`oidcHairpin`), and an
-  optional `longhorn-single` StorageClass (`storage.longhornSingle`).
+  `internal` (admin UIs: Keycloak admin console, and optionally Longhorn
+  and Hubble) in the namespace `conservices-gateway`.
+- Optional `longhorn-single` StorageClass (`storage.longhornSingle`).
 - The `ClusterSecretStore` `openbao` through which External Secrets
   Operator reads the cluster's OpenBao.
 - `bootstrap/scripts/openbao-seed.sh` fills OpenBao: it reads
@@ -135,17 +171,13 @@ First version of the template.
   ExternalSecrets for `DATABASE_URL`, S3 keys, client secrets and service
   tokens. The `ghcr-pull` image pull secret is optional
   (`images.pullSecret.enabled`).
-- Optional self-hosted GitHub Actions runners (`arc.enabled`): Actions
-  Runner Controller 0.15.1 with rootless BuildKit and a test database as
-  sidecars, scale to zero, egress on port 443 only.
 - CPU and memory requests and limits on every container, set in
   `cluster.yaml`; with the example's five modules the defaults total about
-  3 CPU and 8.6 GiB of requests, not counting the prerequisites.
+  2.1 CPU and 6.4 GiB of requests, not counting the prerequisites (Argo CD
+  included).
 - Applications that hold data (`platform-namespaces`, `postgres`) have no
   deletion finalizer, and databases use `databaseReclaimPolicy: retain`, so
   deleting an Application or disabling a module never deletes data.
-- `bootstrap/example-k3s/`: one tested way to build a three-node k3s
-  cluster with Cilium and Longhorn for the template.
 - `examples/cluster.example-filled.yaml`, a complete example with
   `example.org`.
 - CI workflow `.github/workflows/validate.yml`: shell checks, `helm lint`,

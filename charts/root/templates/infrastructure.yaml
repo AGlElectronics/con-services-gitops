@@ -1,35 +1,13 @@
 {{- /*
-Cluster add-ons, sync waves -10 to -1. No finalizers: deleting an
+Cluster-wide objects of Con Services, sync waves -8 to -2. No finalizers: deleting an
 Application leaves the workload running.
 
-cert-manager, trust-manager, External Secrets Operator, OpenBao and the
-CloudNativePG operator are cluster prerequisites installed by the cluster
-operator (docs: deploy/prerequisites); this template only uses them.
+cert-manager, trust-manager, External Secrets Operator, OpenBao, the
+CloudNativePG operator, Argo CD, LoadBalancer IPs and in-cluster DNS are
+cluster prerequisites run by the cluster operator (docs:
+deploy/prerequisites); this template only uses them.
 */ -}}
 {{- $v := .Values }}
-{{- if $v.loadBalancer.ciliumL2.enabled }}
----
-# LoadBalancer IP pool and L2 announcements for Cilium LB IPAM.
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: cilium-lb
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "-10"
-spec:
-  project: default
-  source:
-    {{- include "root.repoSource" (dict "root" $ "path" "charts/cilium-lb") | nindent 4 }}
-    helm:
-      valuesObject:
-        blocks: {{ toJson $v.loadBalancer.ciliumL2.blocks }}
-        interfaces: {{ toJson $v.loadBalancer.ciliumL2.interfaces }}
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: kube-system
-  {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
-{{- end }}
 {{- if $v.storage.longhornSingle.enabled }}
 ---
 # StorageClass longhorn-single (one Longhorn replica) for PostgreSQL.
@@ -87,28 +65,6 @@ spec:
     server: https://kubernetes.default.svc
     namespace: {{ $v.externalSecrets.namespace }}
   {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
-{{- if eq $v.oidcHairpin.mode "coredns-custom" }}
----
-# CoreDNS answers auth.<domain> with the in-cluster Keycloak Service.
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: oidc-hairpin
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "-4"
-spec:
-  project: default
-  source:
-    {{- include "root.repoSource" (dict "root" $ "path" "charts/oidc-hairpin") | nindent 4 }}
-    helm:
-      valuesObject:
-        domain: {{ $v.domain }}
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: kube-system
-  {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
-{{- end }}
 ---
 # Let's Encrypt ClusterIssuers (DNS-01).
 apiVersion: argoproj.io/v1alpha1
@@ -154,54 +110,7 @@ spec:
         public: {{ toJson $v.gateway.public }}
         internal: {{ toJson $v.gateway.internal }}
         adminRoutes: {{ toJson $v.adminRoutes }}
-        argocd: {{ $v.argocd.selfManage }}
   destination:
     server: https://kubernetes.default.svc
     namespace: conservices-gateway
   {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
-{{- if $v.argocd.selfManage }}
----
-# Argo CD manages its own installation (same values as bootstrap/argocd/).
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: argocd
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-spec:
-  project: default
-  sources:
-    - repoURL: https://argoproj.github.io/argo-helm
-      chart: argo-cd
-      targetRevision: 10.14.0
-      helm:
-        releaseName: argocd
-        valueFiles:
-          - $values/bootstrap/argocd/values.yaml
-        {{- $host := printf "argocd.%s" $v.domain }}
-        {{- $ca := dict "group" "" "kind" "ConfigMap" "name" "conservices-internal-ca" }}
-        {{- $argo := dict
-              "global" (dict "domain" $host)
-              "server" (dict
-                "certificate" (dict
-                  "enabled" true
-                  "additionalHosts" (list "argocd-server" "argocd-server.argocd.svc" "argocd-server.argocd.svc.cluster.local")
-                  "issuer" (dict "group" "cert-manager.io" "kind" "ClusterIssuer" "name" "conservices-internal-ca")
-                  "privateKey" (dict "algorithm" "ECDSA" "size" 256 "rotationPolicy" "Always"))
-                "httproute" (dict
-                  "enabled" true
-                  "parentRefs" (list (dict "name" "internal" "namespace" "conservices-gateway" "sectionName" "https"))
-                  "hostnames" (list $host))
-                "backendTLSPolicy" (dict
-                  "enabled" true
-                  "targetRefs" (list (dict "group" "" "kind" "Service" "name" "argocd-server"))
-                  "validation" (dict "hostname" "argocd-server.argocd.svc" "caCertificateRefs" (list $ca)))) }}
-        valuesObject:
-          {{- toYaml (mergeOverwrite $argo $v.argocd.values) | nindent 10 }}
-    {{- include "root.valuesRef" . | nindent 4 }}
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: argocd
-  {{- include "root.syncPolicy" (dict "options" (list "CreateNamespace=true" "ServerSideApply=true") "labels" (dict "app.kubernetes.io/part-of" "conservices" "pod-security.kubernetes.io/enforce" "baseline" "pod-security.kubernetes.io/warn" "restricted")) | nindent 2 }}
-{{- end }}

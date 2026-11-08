@@ -7,8 +7,8 @@
 # --- Required ---------------------------------------------------------------
 
 # Your domain. Apps live on <app>.<domain>, Rally on events.<domain>,
-# Keycloak on auth.<domain> (admin console: auth-admin.<domain>), Argo CD
-# on argocd.<domain> (internal Gateway).
+# Keycloak on auth.<domain> (admin console: auth-admin.<domain>, internal
+# Gateway).
 domain: change-me
 
 git:
@@ -119,32 +119,15 @@ gateway:
   # GatewayClass of your Gateway API implementation.
   className: cilium
   public:
-    # Fixed LoadBalancer IP (Cilium LB IPAM annotation). Empty: any.
+    # Fixed LoadBalancer IP, requested from Cilium LB IPAM with the
+    # annotation lbipam.cilium.io/ips. Empty: any. The IP pool itself is
+    # the cluster's.
     loadBalancerIP: ""
     # Extra annotations for the Gateway's Service (other load balancers).
     annotations: {}
   internal:
     loadBalancerIP: ""
     annotations: {}
-
-loadBalancer:
-  ciliumL2:
-    # true: this template creates a Cilium LB IPAM pool and an L2
-    # announcement policy. Needs Cilium with l2announcements.enabled and
-    # both gateway.*.loadBalancerIP inside the pool.
-    enabled: false
-    # CIDRs (192.0.2.240/29) or ranges ({start: ..., stop: ...}).
-    blocks: []
-    # Node interfaces to announce on (regular expressions). Empty: all.
-    interfaces: []
-
-# How pods reach Keycloak on https://auth.<domain> without leaving the
-# cluster (the issuer URL must be the public one).
-#   coredns-custom: write the ConfigMap kube-system/coredns-custom, read
-#                   by k3s and AKS CoreDNS.
-#   none:           you add the rewrite to CoreDNS yourself.
-oidcHairpin:
-  mode: none
 
 # Admin UIs on the internal Gateway.
 adminRoutes:
@@ -166,9 +149,9 @@ storage:
     enabled: false
 
 # --- Cluster prerequisites --------------------------------------------------
-# cert-manager, trust-manager, External Secrets Operator, OpenBao and the
-# CloudNativePG operator are installed and run by the cluster operator, not
-# by this template. These settings say where to find them.
+# cert-manager, trust-manager, External Secrets Operator, OpenBao, the
+# CloudNativePG operator and Argo CD are installed and run by the cluster
+# operator, not by this template. These settings say where to find them.
 # Reference: https://aglelectronics.github.io/con-services/deploy/prerequisites/
 
 externalSecrets:
@@ -225,27 +208,3 @@ keycloak:
     # true: the realms send mail (password reset, verification) through the
     # server in OpenBao kv/conservices/keycloak/smtp.
     enabled: true
-
-argocd:
-  # true: Argo CD manages its own installation from bootstrap/argocd/values.yaml.
-  selfManage: true
-  values: {}
-
-# --- Self-hosted GitHub Actions runners (optional) --------------------------
-
-arc:
-  enabled: false
-  # Organisation (or repository) the runners register with.
-  githubConfigUrl: https://github.com/your-org
-  runnerScaleSetName: arc-conservices
-  minRunners: 0
-  maxRunners: 3
-  runnerImage: ghcr.io/aglelectronics/ci-runner:2.338.2-1
-  buildkitImage: moby/buildkit:v0.34.2-rootless
-  testDatabaseImage: postgres:16.15-alpine
-  resources:
-    controller: { requests: { cpu: 20m, memory: 64Mi }, limits: { cpu: 200m, memory: 256Mi } }
-    listener: { requests: { cpu: 10m, memory: 32Mi }, limits: { cpu: 100m, memory: 128Mi } }
-    runner: { requests: { cpu: "1", memory: 2Gi }, limits: { cpu: "2", memory: 6Gi } }
-    buildkit: { requests: { cpu: "1", memory: 2Gi }, limits: { cpu: "4", memory: 6Gi } }
-    testDatabase: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 1Gi } }

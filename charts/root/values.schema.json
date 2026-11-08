@@ -29,7 +29,6 @@
     "replicas": {"type": "integer", "minimum": 1},
     "k8sName": {"type": "string", "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"},
     "imageTag": {"type": "string", "not": {"const": "latest"}},
-    "image": {"type": "string", "pattern": "^[^\\s]+:[^\\s:/]+$", "not": {"pattern": ":latest$"}},
     "module": {
       "type": "object",
       "additionalProperties": false,
@@ -173,39 +172,6 @@
         "internal": {"$ref": "#/definitions/gatewaySide"}
       }
     },
-    "loadBalancer": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "ciliumL2": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "enabled": {"type": "boolean"},
-            "blocks": {
-              "type": "array",
-              "items": {
-                "oneOf": [
-                  {"type": "string"},
-                  {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": ["start", "stop"],
-                    "properties": {"start": {"type": "string"}, "stop": {"type": "string"}}
-                  }
-                ]
-              }
-            },
-            "interfaces": {"type": "array", "items": {"type": "string"}}
-          }
-        }
-      }
-    },
-    "oidcHairpin": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {"mode": {"enum": ["none", "coredns-custom"]}}
-    },
     "adminRoutes": {
       "type": "object",
       "additionalProperties": false,
@@ -304,39 +270,6 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {"enabled": {"type": "boolean"}}
-        }
-      }
-    },
-    "argocd": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "selfManage": {"type": "boolean"},
-        "values": {"$ref": "#/definitions/values"}
-      }
-    },
-    "arc": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {"type": "boolean"},
-        "githubConfigUrl": {"type": "string", "pattern": "^https://"},
-        "runnerScaleSetName": {"$ref": "#/definitions/nonEmpty"},
-        "minRunners": {"type": "integer", "minimum": 0},
-        "maxRunners": {"type": "integer", "minimum": 1},
-        "runnerImage": {"$ref": "#/definitions/image"},
-        "buildkitImage": {"$ref": "#/definitions/image"},
-        "testDatabaseImage": {"$ref": "#/definitions/image"},
-        "resources": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "controller": {"$ref": "#/definitions/resources"},
-            "listener": {"$ref": "#/definitions/resources"},
-            "runner": {"$ref": "#/definitions/resources"},
-            "buildkit": {"$ref": "#/definitions/resources"},
-            "testDatabase": {"$ref": "#/definitions/resources"}
-          }
         }
       }
     }

@@ -7,9 +7,12 @@ keeps running everything else: certificates, the database, sign-in, Den
 and the modules.
 
 Cluster-wide services are **prerequisites** that the cluster operator runs
-and the template only uses: cert-manager with trust-manager, External
-Secrets Operator, OpenBao, and the CloudNativePG operator with its Barman
-Cloud plugin.
+and the template only uses: Argo CD, cert-manager with trust-manager,
+External Secrets Operator, OpenBao, the CloudNativePG operator with its
+Barman Cloud plugin, LoadBalancer IPs and cluster DNS. Installing them is
+not covered here; the
+[prerequisites](https://aglelectronics.github.io/con-services/deploy/prerequisites/)
+say what the template needs from each.
 
 Full guide: <https://aglelectronics.github.io/con-services/deploy/>
 
@@ -38,12 +41,13 @@ unsealed OpenBao, CloudNativePG), an S3 service, a domain, and `kubectl`,
     and waits for Den until you pair it there
     ([Deploy the apps](https://aglelectronics.github.io/con-services/deploy/apps/)).
 
-3. **Install Argo CD** with the template's values (pinned chart version):
+3. **Check Argo CD.** It must already run in the cluster and have the
+   health check for Application objects in `argocd-cm` (the block under
+   `configs.cm` in `bootstrap/argocd/values.yaml`); without it every sync
+   wave starts at once:
 
     ```sh
-    helm repo add argo https://argoproj.github.io/argo-helm
-    helm install argocd argo/argo-cd --version 10.14.0 \
-      -n argocd --create-namespace -f bootstrap/argocd/values.yaml
+    kubectl -n argocd get cm argocd-cm -o yaml | grep -c argoproj.io_Application   # prints 1
     ```
 
 4. **Prepare OpenBao and store the secrets** with a token from your
@@ -72,17 +76,15 @@ Each step is explained, with expected output and troubleshooting, in the
 
 | Layer | Components | High availability (default) |
 | --- | --- | --- |
-| Delivery | Argo CD, managing itself after the first install | Redis HA, 2+ replicas of server and repo-server |
 | Certificates | Let's Encrypt ClusterIssuers and the Con Services internal CA, on the cluster's cert-manager and trust-manager | |
 | Secrets | ClusterSecretStore `openbao` for the cluster's OpenBao and External Secrets Operator | |
-| Network | Gateway API (public and internal Gateway), Cilium network policies; optional Cilium LB IPAM | default-deny in every Con Services namespace |
+| Network | Gateway API (public and internal Gateway), Cilium network policies | default-deny in every Con Services namespace |
 | Data | PostgreSQL cluster on the cluster's CloudNativePG with backups to S3 (Barman Cloud plugin); files at a **managed S3 service** | 3 PostgreSQL instances, quorum synchronous replication |
 | Identity | Keycloak via the Keycloak Operator | 2 instances, shared sessions |
 | Apps | Den and the modules, from the Helm charts of `AGlElectronics/con-services` | web apps 2+ replicas with PDBs |
-| CI (optional) | Actions Runner Controller with rootless BuildKit | scale to zero |
 
 Every container has CPU and memory requests and limits. Defaults total
-about 3 CPU and 8.6 GiB of requests with five modules, not counting the
+about 2.1 CPU and 6.4 GiB of requests with five modules, not counting the
 prerequisites; see
 [Sizing](https://aglelectronics.github.io/con-services/deploy/sizing/).
 
@@ -97,10 +99,9 @@ charts/
   module-extras/              ExternalSecrets and access configs of Den and the modules
   postgres/, keycloak/, gateway/, secret-store/, letsencrypt/, ...
                               Small charts for the objects specific to an installation
-values/                       Fixed Helm values of the upstream charts (Actions Runner Controller)
 components/                   Fixed Kustomize folders (internal CA, namespaces, ...)
 bootstrap/                    Used by hand: install-root.sh, Argo CD values,
-                              OpenBao configure and seed scripts, example-k3s/ (an example cluster)
+                              OpenBao configure and seed scripts
 examples/                     cluster.example-filled.yaml, a complete example
 ci/                           Render and validation scripts used by CI
 ```

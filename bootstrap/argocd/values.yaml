@@ -1,17 +1,11 @@
-# Argo CD v3.6.1 (chart argo/argo-cd 10.14.0): HA settings and resources.
+# Reference values for Argo CD v3.6.1 (chart argo/argo-cd 10.14.0).
 # Nothing here is specific to one installation.
 #
-# First install (by hand, before the root Application):
-#
-#   helm repo add argo https://argoproj.github.io/argo-helm
-#   helm install argocd argo/argo-cd --version 10.14.0 -n argocd --create-namespace \
-#     -f bootstrap/argocd/values.yaml
-#
-# Afterwards, with argocd.selfManage: true in cluster.yaml (the default), the
-# root chart's "argocd" Application manages Argo CD with this file plus the
-# values computed from cluster.yaml (hostname, certificate, route) and
-# argocd.values.
-# Guide: https://aglelectronics.github.io/con-services/deploy/argocd/
+# Argo CD is a cluster prerequisite: the template does not install, manage
+# or upgrade it. The Application health check under configs.cm is required
+# for the sync waves; the HA settings and resources are a recommendation
+# you may merge into your own values. Exposing the UI is up to you.
+# Requirements: https://aglelectronics.github.io/con-services/deploy/prerequisites/#9-argo-cd
 
 configs:
   params:

@@ -35,15 +35,6 @@ Renders nothing.
 {{- fail "\n\ncluster.yaml: s3.backup.endpoint differs from s3.endpoint, so set s3.backup.fqdns to its DNS name(s); otherwise the network policies block the backups.\n" }}
 {{- end }}
 
-{{- if $v.loadBalancer.ciliumL2.enabled }}
-{{- if empty $v.loadBalancer.ciliumL2.blocks }}
-{{- fail "\n\ncluster.yaml: loadBalancer.ciliumL2.enabled is true, so set loadBalancer.ciliumL2.blocks to the free addresses of your network (for example [\"192.0.2.240/29\"]).\n" }}
-{{- end }}
-{{- if or (not $v.gateway.public.loadBalancerIP) (not $v.gateway.internal.loadBalancerIP) }}
-{{- fail "\n\ncluster.yaml: loadBalancer.ciliumL2.enabled is true, so set gateway.public.loadBalancerIP and gateway.internal.loadBalancerIP to two addresses inside loadBalancer.ciliumL2.blocks. Your router forwards ports 80 and 443 to the public one.\n" }}
-{{- end }}
-{{- end }}
-
 {{- if and (eq $v.acme.dns01.provider "custom") (empty $v.acme.dns01.solvers) }}
 {{- fail "\n\ncluster.yaml: acme.dns01.provider is \"custom\", so set acme.dns01.solvers (cert-manager ClusterIssuer solvers).\n" }}
 {{- end }}
@@ -53,8 +44,4 @@ Renders nothing.
 {{- if ne (toString $mode) "required" }}
 {{- fail (printf "\n\ncluster.yaml: modules.%s.values.den.mode cannot be changed. Every module in this template waits for Den until you pair it from Den's Modules page.\n" $n) }}
 {{- end }}
-{{- end }}
-
-{{- if and $v.arc.enabled (contains "your-org" $v.arc.githubConfigUrl) }}
-{{- fail "\n\ncluster.yaml: arc.enabled is true, so set arc.githubConfigUrl to your GitHub organisation (https://github.com/<org>).\n" }}
 {{- end }}
