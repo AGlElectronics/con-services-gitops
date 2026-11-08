@@ -3,9 +3,9 @@
 
 Sources: CRDs found in the rendered manifests (ci/render.py includes them)
 plus the CRDs of the cluster prerequisites the template does not install:
-Gateway API and Cilium (downloaded), and cert-manager, trust-manager,
-External Secrets Operator, CloudNativePG and the Barman Cloud plugin
-(rendered from their Helm charts with "helm template --include-crds"). The
+Gateway API and Cilium (downloaded), and Argo CD, cert-manager,
+trust-manager, External Secrets Operator, CloudNativePG and the Barman
+Cloud plugin (rendered from their Helm charts with "helm template --include-crds"). The
 versions below are the ones the documentation lists as tested. Schemas are
 strict: objects without x-kubernetes-preserve-unknown-fields get
 additionalProperties: false, so a misspelt field fails validation.
@@ -27,6 +27,7 @@ GATEWAY_API = "v1.6.3"
 CILIUM = "v1.20.4"
 # (repository, chart, version, extra helm arguments)
 PREREQUISITE_CHARTS = [
+    ("https://argoproj.github.io/argo-helm", "argo-cd", "10.14.0", []),
     ("https://charts.jetstack.io", "cert-manager", "v1.21.3", ["--set", "crds.enabled=true"]),
     ("https://charts.jetstack.io", "trust-manager", "v0.26.0", []),
     ("https://charts.external-secrets.io", "external-secrets", "2.14.0", []),
