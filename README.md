@@ -47,7 +47,7 @@ unsealed OpenBao, CloudNativePG), an S3 service, a domain, and `kubectl`,
    wave starts at once:
 
     ```sh
-    kubectl -n argocd get cm argocd-cm -o yaml | grep -c argoproj.io_Application   # prints 1
+    kubectl -n argocd get cm argocd-cm -o yaml | grep -c health.argoproj.io_Application   # prints 1
     ```
 
 4. **Prepare OpenBao and store the secrets** with a token from your
