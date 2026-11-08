@@ -1,16 +1,17 @@
 # Bootstrap
 
-Everything in this folder is used **by hand**: once to hand the cluster to
-Argo CD, and then for the few steps only a person can do (preparing and
-filling OpenBao). After that, Argo CD manages Con Services from
-`cluster.yaml` and `charts/root`.
+Everything in this folder is used **by hand**: once to let OpenBao trust
+the template and hand the cluster to Argo CD, and then optionally to enter
+your provider credentials. After that, Argo CD manages Con Services from
+`cluster.yaml` and `charts/root`; External Secrets creates the random
+secrets.
 
 | File | What it is | Guide |
 | --- | --- | --- |
 | `argocd/values.yaml` | Reference Argo CD Helm values: the Application health check the sync waves need (required in your Argo CD), plus HA settings and resource limits you may reuse. The template does not install or manage Argo CD | [Prerequisites: Argo CD](https://aglelectronics.github.io/con-services/deploy/prerequisites/#9-argo-cd) |
 | `install-root.sh` | Checks the cluster prerequisites, renders the root Application from `cluster.yaml` and applies it (`--dry-run` prints it instead, `--skip-preflight` skips the checks) | [Argo CD](https://aglelectronics.github.io/con-services/deploy/argocd/) |
-| `scripts/openbao-configure.sh` | Prepares the cluster's OpenBao for Con Services: KV v2 engine, Kubernetes auth, read policy and the role External Secrets Operator logs in with | [Secrets with OpenBao](https://aglelectronics.github.io/con-services/deploy/secrets-openbao/) |
-| `scripts/openbao-seed.sh` | Write every secret the enabled modules and options need: generates the random ones, asks for the provider credentials (S3, SMTP, Cloudflare, registry) | [Secrets with OpenBao](https://aglelectronics.github.io/con-services/deploy/secrets-openbao/#3-seed-the-secrets) |
+| `scripts/openbao-configure.sh` | The OpenBao administrator's one-time step: Kubernetes auth, External Secrets' policy, and the narrow policy and role of the setup Job (with `openbao.setup.enabled: false`: the KV engine and External Secrets' role instead) | [Secrets with OpenBao](https://aglelectronics.github.io/con-services/deploy/secrets-openbao/#2-the-administrators-one-time-step) |
+| `scripts/openbao-seed.sh` | Optional helper: asks for the provider credentials the enabled modules and options need (S3, SMTP, Cloudflare, registry); the OpenBao web UI works as well | [Secrets with OpenBao](https://aglelectronics.github.io/con-services/deploy/secrets-openbao/#4-enter-your-provider-credentials) |
 | `scripts/lib/openbao.sh` | Helpers shared by the scripts | |
 | `scripts/keycloak-realm.py` | For maintainers: regenerates the realm templates of `charts/keycloak` from the development realms of the main repository | [Identity](https://aglelectronics.github.io/con-services/deploy/identity/#the-realms) |
 
@@ -21,4 +22,5 @@ them is the cluster operator's job, not this template's.
 Order: a cluster that meets the
 [prerequisites](https://aglelectronics.github.io/con-services/deploy/prerequisites/),
 including Argo CD with the Application health check, then
-`openbao-configure.sh`, `openbao-seed.sh` and `install-root.sh`.
+`openbao-configure.sh` and `install-root.sh`; sync `openbao-setup` in Argo
+CD, then enter your provider credentials.

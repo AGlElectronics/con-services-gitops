@@ -94,3 +94,13 @@ modules:
 # externalSecrets:
 #   namespace: external-secrets
 #   serviceAccount: external-secrets
+
+# OpenBao setup: by default Argo CD stops at the Application "openbao-setup"
+# until you review it and press Sync; its Job then enables the KV engine and
+# writes External Secrets' role (the OpenBao administrator first runs
+# bootstrap/scripts/openbao-configure.sh once). External Secrets creates the
+# random secrets in any case. The template must not touch OpenBao's
+# configuration (the administrator does all of it):
+# openbao:
+#   setup:
+#     enabled: false

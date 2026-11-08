@@ -103,6 +103,17 @@ jobs:
             --main-repo ../con-services --out build/rendered-no-modules
           python ci/check.py build/rendered-no-modules
 
+      - name: Without the OpenBao setup Job
+        working-directory: gitops
+        run: |
+          set -euo pipefail
+          python ci/render.py --values "$VALUES_FILE" --values ci/openbao-setup-off.yaml \
+            --main-repo ../con-services --out build/rendered-setup-off
+          python ci/check.py build/rendered-setup-off
+          if ls build/rendered-setup-off/openbao-setup--*.yaml >/dev/null 2>&1; then
+            echo "openbao-setup rendered although openbao.setup.enabled is false"; exit 1
+          fi
+
       - name: Schemas (kubeconform, strict)
         working-directory: gitops
         run: |

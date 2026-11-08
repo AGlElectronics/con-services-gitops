@@ -225,6 +225,17 @@
             "mountPath": {"$ref": "#/definitions/nonEmpty"},
             "role": {"$ref": "#/definitions/nonEmpty"}
           }
+        },
+        "namespace": {"type": "string"},
+        "setup": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "role": {"$ref": "#/definitions/nonEmpty"},
+            "serviceAccount": {"$ref": "#/definitions/k8sName"},
+            "image": {"type": "string", "pattern": "^[^\\s:]+(:[^\\s:]+)?(@sha256:[a-f0-9]{64})?$"}
+          }
         }
       }
     },

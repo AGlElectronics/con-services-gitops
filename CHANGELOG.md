@@ -8,7 +8,40 @@ and the repository uses [Semantic Versioning](https://semver.org/).
 
 First version of the template.
 
+### Added
+
+- OpenBao is set up by Argo CD after a review. The new Application
+  `openbao-setup` (wave -5) is the only one without automatic sync: Argo CD
+  waits there until you have looked at its diff and pressed **Sync**. Its
+  Job then enables the KV engine and writes the role External Secrets logs
+  in with. It logs in through the narrow role `conservices-setup` that the
+  OpenBao administrator creates once with `openbao-configure.sh`. That role
+  cannot read secrets or grant itself more rights. On by default
+  (`openbao.setup.enabled`); set it to `false` to keep OpenBao's
+  configuration entirely in the administrator's hands. New `cluster.yaml`
+  keys: `openbao.namespace` and `openbao.setup.*`.
+- External Secrets creates every random secret (database passwords, Den
+  operator token, service tokens, Desk key, Keycloak client secrets and
+  bootstrap admin password) through PushSecrets. It never replaces an
+  existing value. You only enter your provider credentials.
+
 ### Changed
+
+- **BREAKING:** External Secrets' OpenBao policy is now
+  `conservices-external-secrets` and may also create entries under `kv/`
+  (for the random secrets); `conservices-external-secrets-read` is no longer
+  used. Run `bootstrap/scripts/openbao-configure.sh` again, sync
+  `openbao-setup`, then delete the old policy with
+  `bao policy delete conservices-external-secrets-read`.
+- **BREAKING:** `openbao-seed.sh` no longer generates values and lost
+  `--rotate`; it only asks for your provider credentials (S3, SMTP,
+  Cloudflare, registry). To rotate a generated value, delete it in OpenBao
+  and External Secrets creates a new one
+  ([how](https://aglelectronics.github.io/con-services/deploy/secrets-openbao/#rotate-a-generated-value)).
+  Entries the old script wrote stay as they are. `openssl` is no longer
+  needed.
+- Keycloak's temporary admin is always named `temp-admin`; only its password
+  is read from `kv/conservices/keycloak/bootstrap-admin`.
 
 - **BREAKING:** cert-manager, trust-manager, External Secrets Operator,
   OpenBao, the CloudNativePG operator and its Barman Cloud plugin are now

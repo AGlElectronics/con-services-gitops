@@ -28,6 +28,63 @@ tasks:   { host: tasks,   role: tasks,   label: tasks,   slug: tasks,   title: T
 {{- toJson $out }}
 {{- end }}
 
+{{/*
+What OpenBao holds for this cluster.yaml, as JSON. "generated" lists the
+entries External Secrets fills with random values (path below kvPath and
+its properties); the rest are entered by a person.
+*/}}
+{{- define "root.seedPlan" -}}
+{{- $v := .Values }}
+{{- $meta := include "root.moduleMeta" . | fromYaml }}
+{{- $enabled := include "root.enabledModules" . | fromJsonArray }}
+{{- $roles := list "den" "keycloak" }}
+{{- $s3 := list "postgres/backup-s3" "den/backup-s3" "den/files-s3" "den/s3" }}
+{{- $tokens := list }}
+{{- range $n := $enabled }}
+{{- $m := index $meta $n }}
+{{- $roles = append $roles $m.role }}
+{{- if $m.s3 }}{{ $s3 = append $s3 (printf "%s/s3" $n) }}{{ end }}
+{{- if has $n (list "learn" "wiki" "tasks") }}{{ $tokens = append $tokens $n }}{{ end }}
+{{- end }}
+{{- $gen := list (dict "path" "conservices/postgres/superuser" "properties" (list "password")) }}
+{{- range $roles }}{{ $gen = append $gen (dict "path" (printf "conservices/postgres/roles/%s" .) "properties" (list "password")) }}{{ end }}
+{{- $gen = append $gen (dict "path" "conservices/den/operator-token" "properties" (list "token")) }}
+{{- range $tokens }}{{ $gen = append $gen (dict "path" (printf "conservices/service-tokens/%s" .) "properties" (list "token")) }}{{ end }}
+{{- if has "desk" $enabled }}{{ $gen = append $gen (dict "path" "conservices/desk/secret-key" "properties" (list "key")) }}{{ end }}
+{{- $gen = append $gen (dict "path" "conservices/keycloak/bootstrap-admin" "properties" (list "password")) }}
+{{- $gen = append $gen (dict "path" "conservices/keycloak/clients" "properties" (list "den-keycloak" "hr-provisioner" "learn-provisioner")) }}
+{{- dict
+  "modules" $enabled
+  "roles" $roles
+  "s3" $s3
+  "serviceTokens" $tokens
+  "generated" $gen
+  "desk" (has "desk" $enabled)
+  "smtp" $v.keycloak.smtp.enabled
+  "cloudflare" (eq $v.acme.dns01.provider "cloudflare")
+  "ghcr" $v.images.pullSecret.enabled
+  "kvPath" $v.openbao.kvPath
+  "authMount" $v.openbao.auth.mountPath
+  "authRole" $v.openbao.auth.role
+  "esoNamespace" $v.externalSecrets.namespace
+  "esoServiceAccount" $v.externalSecrets.serviceAccount
+  "setup" $v.openbao.setup
+  "setupNamespace" (include "root.setupNamespace" .)
+  "caBundle" (dict
+    "kind" $v.openbao.caBundle.kind
+    "name" $v.openbao.caBundle.name
+    "namespace" ($v.openbao.caBundle.namespace | default $v.externalSecrets.namespace))
+  | toJson }}
+{{- end }}
+
+{{/*
+Namespace of the openbao-setup Job: where OpenBao's CA bundle is, so the
+Job can mount it.
+*/}}
+{{- define "root.setupNamespace" -}}
+{{- .Values.openbao.caBundle.namespace | default .Values.externalSecrets.namespace }}
+{{- end }}
+
 {{- define "root.issuer" -}}
 https://auth.{{ .Values.domain }}/realms/conservices
 {{- end }}

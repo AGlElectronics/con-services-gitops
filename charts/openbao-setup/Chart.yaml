@@ -1,0 +1,6 @@
+apiVersion: v2
+name: openbao-setup
+description: >-
+  One Job that prepares the cluster's OpenBao for Con Services: enables the KV version 2 engine and writes the role External Secrets Operator logs in with. Logs in as its own service account through a role the OpenBao administrator created once. Values come from the root chart (cluster.yaml openbao.*).
+type: application
+version: 1.0.0

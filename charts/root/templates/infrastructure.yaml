@@ -44,8 +44,35 @@ spec:
     server: https://kubernetes.default.svc
     namespace: cert-manager
   {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
+{{- if $v.openbao.setup.enabled }}
 ---
-# ClusterSecretStore "openbao": how External Secrets reads the cluster's OpenBao.
+# OpenBao setup for Con Services: a Job that enables the KV engine and writes
+# External Secrets' role. Manual sync: Argo CD waits here (the waves after it
+# do not start) until you have reviewed the diff and pressed Sync.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openbao-setup
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  project: default
+  source:
+    {{- include "root.repoSource" (dict "root" $ "path" "charts/openbao-setup") | nindent 4 }}
+    helm:
+      valuesObject:
+        openbao: {{ toJson (omit $v.openbao "setup") }}
+        externalSecrets: {{ toJson $v.externalSecrets }}
+        setup: {{ toJson $v.openbao.setup }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ include "root.setupNamespace" $ }}
+  {{- include "root.syncPolicy" (dict "manual" true "options" (list "ServerSideApply=true")) | nindent 2 }}
+{{- end }}
+---
+# ClusterSecretStore "openbao": how External Secrets reads the cluster's
+# OpenBao, and the PushSecrets that create the random values in it.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -59,8 +86,9 @@ spec:
     {{- include "root.repoSource" (dict "root" $ "path" "charts/secret-store") | nindent 4 }}
     helm:
       valuesObject:
-        openbao: {{ toJson $v.openbao }}
+        openbao: {{ toJson (omit $v.openbao "setup") }}
         externalSecrets: {{ toJson $v.externalSecrets }}
+        generated: {{ toJson (include "root.seedPlan" $ | fromJson).generated }}
   destination:
     server: https://kubernetes.default.svc
     namespace: {{ $v.externalSecrets.namespace }}

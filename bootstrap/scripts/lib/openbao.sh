@@ -70,9 +70,6 @@ token_from_env_or_file() {
   fi
 }
 
-# gen_secret [bytes]: random URL- and shell-safe value (hex), default 32 bytes.
-gen_secret() { openssl rand -hex "${1:-32}"; }
-
 # kv_exists <token> <path>: true if $OPENBAO_KV/<path> has data.
 kv_exists() {
   bao_cmd "$1" bao kv get -format=json "$OPENBAO_KV/$2" >/dev/null 2>&1

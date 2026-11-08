@@ -1,7 +1,8 @@
 {{- if eq .Values.app "desk" }}
 # Secrets of Desk in conservices-desk, built by External Secrets from OpenBao
 # (ClusterSecretStore "openbao", KV v2 at "kv"). Nothing secret is in Git.
-# Fill the OpenBao entries with bootstrap/scripts/openbao-seed.sh.
+# Random values are created by External Secrets (charts/secret-store); S3
+# keys are entered by you (bootstrap/scripts/openbao-seed.sh).
 # Inventory: https://aglelectronics.github.io/con-services/operations/secrets/
 #
 # DATABASE_URL: the role's password comes from the same OpenBao entry that

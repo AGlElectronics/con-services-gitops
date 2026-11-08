@@ -1,0 +1,87 @@
+{{- /*
+The setup Job. Its Application has no automated sync: it runs when you press
+Sync in Argo CD. Force/Replace recreates the Job on every sync, so pressing
+Sync again runs it again. The finished Job is kept: its log is the record of
+what was changed (OpenBao's audit log has the details).
+*/ -}}
+{{- $o := .Values.openbao }}
+{{- $s := .Values.setup }}
+{{- $ca := $o.caBundle }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $s.serviceAccount }}
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: conservices-openbao-setup
+  namespace: {{ .Release.Namespace }}
+data:
+  setup.sh: |-
+    {{- .Files.Get "files/setup.sh" | nindent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: conservices-openbao-setup
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: conservices-openbao-setup
+    spec:
+      serviceAccountName: {{ $s.serviceAccount }}
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: setup
+          image: {{ $s.image }}
+          command: ["/bin/sh", "/scripts/setup.sh"]
+          env:
+            - { name: BAO_ADDR, value: {{ $o.server | quote }} }
+            {{- if $ca.name }}
+            - { name: BAO_CACERT, value: /ca/{{ $ca.key }} }
+            {{- end }}
+            - { name: HOME, value: /tmp }
+            - { name: KV_PATH, value: {{ $o.kvPath | quote }} }
+            - { name: AUTH_MOUNT, value: {{ $o.auth.mountPath | quote }} }
+            - { name: ESO_ROLE, value: {{ $o.auth.role | quote }} }
+            - { name: ESO_NAMESPACE, value: {{ .Values.externalSecrets.namespace | quote }} }
+            - { name: ESO_SERVICE_ACCOUNT, value: {{ .Values.externalSecrets.serviceAccount | quote }} }
+            - { name: SETUP_ROLE, value: {{ $s.role | quote }} }
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: scripts, mountPath: /scripts, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+            {{- if $ca.name }}
+            - { name: ca, mountPath: /ca, readOnly: true }
+            {{- end }}
+      volumes:
+        - name: scripts
+          configMap: { name: conservices-openbao-setup }
+        - name: tmp
+          emptyDir: { sizeLimit: 16Mi }
+        {{- if $ca.name }}
+        - name: ca
+          {{- if eq $ca.kind "Secret" }}
+          secret: { secretName: {{ $ca.name }} }
+          {{- else }}
+          configMap: { name: {{ $ca.name }} }
+          {{- end }}
+        {{- end }}

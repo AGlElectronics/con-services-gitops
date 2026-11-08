@@ -87,9 +87,18 @@ Root Application applied. Follow the sync waves with:
 
   kubectl get applications -n argocd -w
 
-Applications that read secrets stay Degraded until OpenBao is prepared and
-filled (once per cluster):
+EOF
+if [[ "$(jq -r '.setup.enabled' <<<"$(seed_plan "$CLUSTER_FILE")")" == "true" ]]; then
+  cat >&2 <<EOF
+Argo CD stops at the Application "openbao-setup" (manual sync). Review its
+diff in Argo CD, then press Sync. The OpenBao administrator must have run
+bootstrap/scripts/openbao-configure.sh once before.
 
-  BAO_TOKEN=... bash bootstrap/scripts/openbao-configure.sh
-  BAO_TOKEN=... bash bootstrap/scripts/openbao-seed.sh
+EOF
+fi
+cat >&2 <<EOF
+Applications that read your provider credentials (S3, SMTP, Cloudflare) stay
+Degraded until those entries exist in OpenBao. The random values are
+created by External Secrets. Guide:
+https://aglelectronics.github.io/con-services/deploy/secrets-openbao/
 EOF

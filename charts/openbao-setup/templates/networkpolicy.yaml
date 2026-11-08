@@ -1,0 +1,31 @@
+{{- /*
+The setup Job may only reach DNS and the OpenBao pods. OpenBao's own
+namespace must admit it too (docs: operations/network-policies).
+*/ -}}
+{{- if .Values.openbao.namespace }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: conservices-openbao-setup
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: conservices-openbao-setup
+  policyTypes: [Ingress, Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.openbao.namespace }}
+{{- end }}

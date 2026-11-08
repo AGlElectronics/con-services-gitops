@@ -174,11 +174,25 @@ openbao:
     name: openbao-ca
     key: ca.crt
     namespace: ""
-  # Kubernetes auth method: mount path and role (created by
-  # bootstrap/scripts/openbao-configure.sh).
+  # Kubernetes auth method: mount path, and the role External Secrets
+  # Operator logs in with (policy conservices-external-secrets).
   auth:
     mountPath: kubernetes
     role: external-secrets
+  # Namespace of the OpenBao pods. The setup Job may only connect there
+  # (NetworkPolicy). Empty: no NetworkPolicy for the Job.
+  namespace: openbao
+  # The Application "openbao-setup" (manual sync): a Job that enables the
+  # KV engine at kvPath and writes the role auth.role for External Secrets.
+  # It logs in as its own service account with setup.role, which the
+  # OpenBao administrator creates once (bootstrap/scripts/openbao-configure.sh).
+  # Argo CD stops at this Application until you review it and press Sync.
+  # false: you do both yourself; see deploy/secrets-openbao in the docs.
+  setup:
+    enabled: true
+    role: conservices-setup
+    serviceAccount: conservices-openbao-setup
+    image: quay.io/openbao/openbao:2.7.2
 
 # --- Platform components ----------------------------------------------------
 

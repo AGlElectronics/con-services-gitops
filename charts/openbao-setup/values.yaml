@@ -1,0 +1,23 @@
+# Set by the root chart from cluster.yaml (openbao.*, externalSecrets.*).
+openbao:
+  server: https://openbao-active.openbao.svc:8200
+  kvPath: kv
+  caBundle:
+    kind: ConfigMap
+    name: openbao-ca
+    key: ca.crt
+    namespace: external-secrets
+  auth:
+    mountPath: kubernetes
+    role: external-secrets
+  namespace: openbao
+externalSecrets:
+  namespace: external-secrets
+  serviceAccount: external-secrets
+setup:
+  role: conservices-setup
+  serviceAccount: conservices-openbao-setup
+  image: quay.io/openbao/openbao:2.7.2
+resources:
+  requests: { cpu: 10m, memory: 32Mi }
+  limits: { cpu: 200m, memory: 128Mi }

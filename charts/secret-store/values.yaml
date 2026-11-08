@@ -13,3 +13,6 @@ openbao:
 externalSecrets:
   namespace: external-secrets
   serviceAccount: external-secrets
+# Entries External Secrets fills with random values: path below kvPath and
+# the properties to generate. Set by the root chart (seed plan "generated").
+generated: []

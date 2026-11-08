@@ -1,0 +1,6 @@
+# Laid over examples/cluster.example-filled.yaml by CI: the OpenBao
+# administrator sets up OpenBao by hand, so there is no openbao-setup
+# Application.
+openbao:
+  setup:
+    enabled: false

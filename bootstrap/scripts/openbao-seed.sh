@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Write every secret Con Services reads from OpenBao. Run after
-# openbao-configure.sh, from the root of your copy of this repository.
+# Enter the secrets only you know (provider credentials) into OpenBao. One
+# way of several: the OpenBao web UI or "bao kv put" work just as well. The
+# random values (database passwords, tokens, client secrets) are not here:
+# External Secrets Operator creates them (charts/secret-store). Run from the
+# root of your copy of this repository.
 #
 #   BAO_TOKEN=... bash bootstrap/scripts/openbao-seed.sh   # token that may write kv/*
 #   # or, with the init file of a fresh OpenBao (root token):
@@ -11,31 +14,16 @@
 # entries go under that mount instead.
 #
 # It reads cluster.yaml (through the root chart, so "helm" is needed) and
-# only creates the entries the enabled modules and options need. Existing
+# only asks for the entries the enabled modules and options need. Existing
 # entries are kept, so running it again is safe: answer the prompts you
 # skipped, or run it after enabling a module. Nothing secret is printed and
 # values never appear on a command line.
 #
 # Options:
-#   --rotate              Replace the rotatable random values (database
-#                         passwords, Den operator token, service tokens).
-#                         See "Rotation" below.
-#   --no-prompt           Do not ask for the values only you know (S3 keys,
-#                         SMTP, Cloudflare, GitHub); list the missing ones.
-#   --modules a,b,c       Seed for exactly these modules instead of the
+#   --no-prompt           Ask nothing; list the entries that are missing.
+#   --modules a,b,c       Check exactly these modules instead of the
 #                         modules.<name>.enabled settings of cluster.yaml.
 #   --cluster-file PATH   Settings file (default: cluster.yaml).
-#
-# Generated here (random, 32 bytes hex):
-#   kv/conservices/postgres/superuser          username (postgres), password
-#   kv/conservices/postgres/roles/<role>       password  den, keycloak, and one
-#                                              per enabled module (Rally: events)
-#   kv/conservices/den/operator-token          token
-#   kv/conservices/service-tokens/<module>     token     learn, wiki, tasks
-#   kv/conservices/desk/secret-key             key       desk
-#   kv/conservices/keycloak/bootstrap-admin    username (temp-admin), password
-#   kv/conservices/keycloak/clients            den-keycloak, hr-provisioner,
-#                                              learn-provisioner
 #
 # Asked for (empty answer = skip, run again later):
 #   kv/conservices/<app>/s3                    access_key, secret_key
@@ -51,42 +39,28 @@
 #   kv/infra/ghcr                              username, token
 #                                              (images.pullSecret.enabled)
 #
-# Rotation (--rotate) only touches values that every side reads from the same
-# OpenBao entry: database role and superuser passwords (CloudNativePG changes
-# them in PostgreSQL), the Den operator token and the service tokens. After
-# rotating, wait for External Secrets to refresh (up to 1 hour, or annotate
-# the ExternalSecrets with force-sync) and restart the module Deployments.
-# It never rotates:
-#   - desk/secret-key: it encrypts stored mailbox passwords; a new key makes
-#     them unreadable.
-#   - keycloak/clients and keycloak/bootstrap-admin: Keycloak keeps its own
-#     copy after the first import. Regenerate the client secret in the
-#     Keycloak admin console, then store it with "bao kv patch".
-#
 # Guide: https://aglelectronics.github.io/con-services/deploy/secrets-openbao/
 set -euo pipefail
 umask 077
 
 # shellcheck source=lib/openbao.sh
 source "$(dirname "$0")/lib/openbao.sh"
-need kubectl jq openssl helm
+need kubectl jq helm
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CLUSTER_FILE="$REPO_ROOT/cluster.yaml"
-ROTATE=0
 PROMPT=1
 MODULES=""
 ALL_MODULES=(stash hr rally finance learn wiki desk tasks)
 
 while (($#)); do
   case "$1" in
-    --rotate) ROTATE=1 ;;
     --no-prompt) PROMPT=0 ;;
     --modules) shift; MODULES="${1:-}"; [[ -n "$MODULES" ]] || die "--modules needs a list, e.g. --modules stash,wiki" ;;
     --modules=*) MODULES="${1#*=}" ;;
     --cluster-file) shift; CLUSTER_FILE="${1:-}" ;;
     --cluster-file=*) CLUSTER_FILE="${1#*=}" ;;
-    -h|--help) sed -n '2,69p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,42p' "$0"; exit 0 ;;
     *) die "unknown option: $1 (see --help)" ;;
   esac
   shift
@@ -119,43 +93,8 @@ bao_cmd "$TOKEN" bao token lookup -format=json >/dev/null 2>&1 \
 
 MISSING=()
 
-# put_generated <path> <json> <rotatable 0|1>
-put_generated() {
-  if kv_exists "$TOKEN" "$1"; then
-    if [[ "$3" == "1" && "$ROTATE" == "1" ]]; then
-      kv_put_json "$TOKEN" "$1" "$2"
-      log "$OPENBAO_KV/$1 rotated"
-    else
-      log "$OPENBAO_KV/$1 already exists, keeping it"
-    fi
-    return 0
-  fi
-  kv_put_json "$TOKEN" "$1" "$2"
-  log "$OPENBAO_KV/$1 written"
-}
-
-one() { jq -n --arg k "$1" --arg v "$(gen_secret)" '{($k): $v}'; }
 list() { jq -r --arg k "$1" '.[$k][]' <<<"$plan"; }
 flag() { [[ "$(jq -r --arg k "$1" '.[$k]' <<<"$plan")" == "true" ]]; }
-
-# --- Generated values -------------------------------------------------------------
-put_generated conservices/postgres/superuser \
-  "$(jq -n --arg p "$(gen_secret)" '{username: "postgres", password: $p}')" 1
-while read -r role; do
-  put_generated "conservices/postgres/roles/$role" "$(one password)" 1
-done < <(list roles)
-put_generated conservices/den/operator-token "$(one token)" 1
-while read -r module; do
-  put_generated "conservices/service-tokens/$module" "$(one token)" 1
-done < <(list serviceTokens)
-if flag desk; then
-  put_generated conservices/desk/secret-key "$(one key)" 0
-fi
-put_generated conservices/keycloak/bootstrap-admin \
-  "$(jq -n --arg p "$(gen_secret)" '{username: "temp-admin", password: $p}')" 0
-put_generated conservices/keycloak/clients \
-  "$(jq -n --arg a "$(gen_secret)" --arg b "$(gen_secret)" --arg c "$(gen_secret)" \
-     '{"den-keycloak": $a, "hr-provisioner": $b, "learn-provisioner": $c}')" 0
 
 # --- Values only you know ------------------------------------------------------------
 # ask <path> <fields> <description>: true if the caller should prompt for <path>.
@@ -239,4 +178,4 @@ if ((${#MISSING[@]})); then
   printf '      %s\n' "${MISSING[@]}" >&2
   log "Run this script again (without --no-prompt) to enter them."
 fi
-log "Seeding done. Check with: kubectl get externalsecret -A"
+log "Done. Check with: kubectl get externalsecret,pushsecret -A"
