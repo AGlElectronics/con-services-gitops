@@ -1,5 +1,11 @@
 # Con Services GitOps template
 
+> [!WARNING]
+> ## **NOT READY FOR PRODUCTION**
+>
+> Con Services is under active development. Expect breaking changes, missing
+> features and bugs. Do not use it for real events or real data yet.
+
 A blank production template for running Con Services on Kubernetes with
 [Argo CD](https://argo-cd.readthedocs.io/). You make your own private copy,
 fill in **one settings file, `cluster.yaml`**, and Argo CD installs and
