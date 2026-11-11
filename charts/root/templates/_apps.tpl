@@ -157,6 +157,10 @@ frontend:
     authMode: oidc
     oidcAuthority: {{ include "root.issuer" $root }}
     oidcClientId: {{ $meta.role }}-spa
+  {{- if eq $n "hr" }}
+  securityHeaders:
+    keycloakOrigin: https://{{ include "root.fqdn" (dict "root" $root "host" $root.Values.keycloak.host) }}
+  {{- end }}
 config:
   APP_BASE_URL: https://{{ $host }}
   OIDC_ISSUER_URL: {{ include "root.issuer" $root }}
@@ -173,10 +177,16 @@ config:
   CORS_ALLOWED_ORIGINS: https://{{ $host }}
   {{- end }}
   {{- if eq $n "hr" }}
+  OIDC_AUDIENCE: hr-api
   KEYCLOAK_SETUP_REDIRECT_URI: https://{{ $denHost }}/
   {{- $catalogs := list }}
   {{- if has "stash" $enabled }}{{ $catalogs = append $catalogs "stash=https://stash-backend.conservices-stash.svc.cluster.local:8080/api/role-catalog" }}{{ end }}
   {{- if has "rally" $enabled }}{{ $catalogs = append $catalogs "events=https://rally-backend.conservices-rally.svc.cluster.local:8080/api/role-catalog" }}{{ end }}
+  {{- if has "learn" $enabled }}{{ $catalogs = append $catalogs "learn=https://learn-backend.conservices-learn.svc.cluster.local:8080/api/role-catalog" }}{{ end }}
+  {{- if has "finance" $enabled }}{{ $catalogs = append $catalogs "finance=https://finance-backend.conservices-finance.svc.cluster.local:8080/api/role-catalog" }}{{ end }}
+  {{- if has "desk" $enabled }}{{ $catalogs = append $catalogs "desk=https://desk-backend.conservices-desk.svc.cluster.local:8080/api/role-catalog" }}{{ end }}
+  {{- if has "tasks" $enabled }}{{ $catalogs = append $catalogs "tasks=https://tasks-backend.conservices-tasks.svc.cluster.local:8080/api/role-catalog" }}{{ end }}
+  {{- if has "wiki" $enabled }}{{ $catalogs = append $catalogs "wiki=https://wiki-backend.conservices-wiki.svc.cluster.local:8080/api/role-catalog" }}{{ end }}
   ROLE_CATALOG_SOURCES: {{ join "," $catalogs | quote }}
   LEARN_HOLDINGS_URL: {{ ternary "https://learn-backend.conservices-learn.svc.cluster.local:8080/api/internal/holdings" "" (has "learn" $enabled) | quote }}
   {{- end }}
@@ -198,7 +208,7 @@ submit:
 {{ include "root.appCommon" (dict "root" $root "host" $host "s3" $meta.s3 "fqdns" $s3.fqdns) }}
 {{- if eq $n "hr" }}
   {{- $egress := list }}
-  {{- range $t := list "stash" "rally" "learn" "wiki" "tasks" }}
+  {{- range $t := list "stash" "rally" "learn" "wiki" "tasks" "finance" "desk" }}
   {{- if has $t $enabled }}{{ $egress = append $egress (printf "conservices-%s" $t) }}{{ end }}
   {{- end }}
   # HR calls these backends (role catalogs, holdings, hooks).
@@ -216,4 +226,8 @@ namespace: conservices-{{ .name }}
 enabledModules: {{ include "root.enabledModules" .root }}
 pullSecret: {{ $v.images.pullSecret.enabled }}
 accessConfig: {{ $access | quote }}
+{{- if eq .name "hr" }}
+{{- $hr := index $v.modules "hr" | default dict }}
+googleWorkspace: {{ dig "googleWorkspace" "enabled" false ($hr.values | default dict) }}
+{{- end }}
 {{- end }}

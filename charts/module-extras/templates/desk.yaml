@@ -33,6 +33,10 @@ spec:
         # Encrypts the Den credential the module stores (shared denlink).
         DEN_LINK_ENCRYPTION_KEY: "{{`{{ .denLinkKey }}`}}"
         DESK_SECRET_KEY: "{{`{{ .deskSecretKey }}`}}"
+        {{- if has "hr" .Values.enabledModules }}
+        # Same value as hr-secrets. HR reads this catalog with it.
+        HR_SERVICE_TOKEN: "{{`{{ .hrServiceToken }}`}}"
+        {{- end }}
   data:
     - secretKey: denLinkKey
       remoteRef:
@@ -46,4 +50,10 @@ spec:
       remoteRef:
         key: modules/desk/secret-key
         property: key
+    {{- if has "hr" .Values.enabledModules }}
+    - secretKey: hrServiceToken
+      remoteRef:
+        key: modules/hr/service-token
+        property: hr_service_token
+    {{- end }}
 {{- end }}

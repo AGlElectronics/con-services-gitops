@@ -32,6 +32,10 @@ spec:
         S3_ACCESS_KEY_ID: "{{`{{ .s3AccessKey }}`}}"
         S3_SECRET_ACCESS_KEY: "{{`{{ .s3SecretKey }}`}}"
         TASKS_SERVICE_TOKEN: "{{`{{ .tasksToken }}`}}"
+        {{- if has "hr" .Values.enabledModules }}
+        # Same value as hr-secrets. HR reads this catalog with it.
+        HR_SERVICE_TOKEN: "{{`{{ .hrServiceToken }}`}}"
+        {{- end }}
   data:
     - secretKey: denLinkKey
       remoteRef:
@@ -53,4 +57,10 @@ spec:
       remoteRef:
         key: modules/tasks/service-token
         property: token
+    {{- if has "hr" .Values.enabledModules }}
+    - secretKey: hrServiceToken
+      remoteRef:
+        key: modules/hr/service-token
+        property: hr_service_token
+    {{- end }}
 {{- end }}

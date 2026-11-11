@@ -32,6 +32,11 @@ spec:
         S3_ACCESS_KEY_ID: "{{`{{ .s3AccessKey }}`}}"
         S3_SECRET_ACCESS_KEY: "{{`{{ .s3SecretKey }}`}}"
         WIKI_SERVICE_TOKEN: "{{`{{ .wikiToken }}`}}"
+        {{- if has "hr" .Values.enabledModules }}
+        # Same value as hr-secrets. HR reads this catalog; Wiki calls HR's directory.
+        HR_SERVICE_TOKEN: "{{`{{ .hrServiceToken }}`}}"
+        HR_DIRECTORY_TOKEN: "{{`{{ .hrDirectoryToken }}`}}"
+        {{- end }}
   data:
     - secretKey: denLinkKey
       remoteRef:
@@ -53,4 +58,14 @@ spec:
       remoteRef:
         key: modules/wiki/service-token
         property: token
+    {{- if has "hr" .Values.enabledModules }}
+    - secretKey: hrServiceToken
+      remoteRef:
+        key: modules/hr/service-token
+        property: hr_service_token
+    - secretKey: hrDirectoryToken
+      remoteRef:
+        key: modules/hr/directory-token
+        property: hr_directory_token
+    {{- end }}
 {{- end }}

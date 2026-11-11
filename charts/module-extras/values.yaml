@@ -8,3 +8,6 @@ enabledModules: [stash, hr, rally, finance, learn, wiki, desk, tasks]
 pullSecret: false
 # Access configuration (TOML). Empty: files/access-config/<app>.toml.
 accessConfig: ""
+# HR only: mount the Google Workspace key from OpenBao modules/hr/google-workspace.
+# Set from modules.hr.values.googleWorkspace.enabled in cluster.yaml.
+googleWorkspace: false

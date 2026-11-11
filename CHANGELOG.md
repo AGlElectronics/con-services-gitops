@@ -19,15 +19,24 @@ First release of the template (1.0.0).
   Telegram off and does not Degrade Learn. Turn the Learn chart's
   `networkPolicy.telegram` on together with that token.
   `DEN_LINK_ENCRYPTION_KEY` was already generated for every module.
+- `HR_SERVICE_TOKEN` is generated in OpenBao (`modules/hr/service-token`,
+  property `hr_service_token`) and copied into `hr-secrets` and, when HR is
+  enabled, into the secrets of Wiki, Finance, Rally, Tasks, Stash, Learn
+  and Desk. Those modules check it on `GET /api/role-catalog`. HR's egress
+  list includes every enabled module namespace.
+- `HR_DIRECTORY_TOKEN` is generated (`modules/hr/directory-token`) and copied
+  into `hr-secrets` and `wiki-secrets`. The Wiki sends it to HR's group
+  directory.
+- With `modules.hr.values.googleWorkspace.enabled: true`, an ExternalSecret
+  `hr-google-workspace` reads the service-account key you store at
+  `modules/hr/google-workspace` (property `credentials.json`). It is not
+  generated.
 
 - Stash's ExternalSecret includes optional `TELEGRAM_BOT_TOKEN` and
   `SMTP_PASSWORD`, from OpenBao `modules/stash/telegram` (`token`) and
   `modules/stash/smtp` (`password`). `openbao-seed.sh` and `.ps1` ask for
   them when Stash is enabled; leaving them unset does not Degrade Stash
-  (the features stay off). When HR and Stash are both enabled, External
-  Secrets generates `modules/hr/service-token` and puts the same
-  `HR_SERVICE_TOKEN` in `hr-secrets` and `stash-secrets`, so HR can read
-  Stash's role catalog. `DEN_LINK_ENCRYPTION_KEY` was already generated
+  (the features stay off). `DEN_LINK_ENCRYPTION_KEY` was already generated
   per module.
 
 **Installation with Argo CD**
