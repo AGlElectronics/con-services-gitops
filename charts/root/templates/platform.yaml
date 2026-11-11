@@ -134,6 +134,7 @@ spec:
         podDisruptionBudget: {{ not $profile.small }}
         resources: {{ toJson $v.keycloak.resources }}
         smtp: {{ toJson $v.keycloak.smtp }}
+        realm: {{ toJson $v.keycloak.realm }}
   destination:
     server: https://kubernetes.default.svc
     namespace: conservices-identity

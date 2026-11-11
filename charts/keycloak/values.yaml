@@ -32,3 +32,30 @@ resources:
 smtp:
   # true: realms send mail through OpenBao conservices/infra/keycloak/smtp.
   enabled: true
+# Sign-in protection of both realms (conservices and attendees). Set by the
+# root chart from cluster.yaml keycloak.realm. Applied at the first import
+# only; change a running realm in the admin console (docs: deploy/identity).
+realm:
+  bruteForce:
+    # Temporary lockout after failureFactor failed sign-ins within
+    # maxDeltaTimeSeconds; the wait grows by waitIncrementSeconds per
+    # failure up to maxFailureWaitSeconds.
+    enabled: true
+    permanentLockout: false
+    failureFactor: 10
+    waitIncrementSeconds: 60
+    maxFailureWaitSeconds: 900
+    maxDeltaTimeSeconds: 43200
+    minimumQuickLoginWaitSeconds: 60
+    quickLoginCheckMilliSeconds: 1000
+  passwordPolicy:
+    minLength: 12
+    notUsername: true
+    notEmail: true
+    # More Keycloak policies joined with " and ", e.g. "passwordHistory(3)".
+    extra: ""
+  # true: den-keycloak may write the realm (realm-management manage-realm)
+  # so Den keeps the realm display name equal to the organisation name.
+  # false: den-keycloak gets no realm-management role; set the display name
+  # in the admin console yourself.
+  denDisplayNameSync: true

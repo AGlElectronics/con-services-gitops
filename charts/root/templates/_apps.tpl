@@ -89,7 +89,9 @@ config:
   APP_BASE_URL: https://{{ $denHost }}
   OIDC_ISSUER_URL: {{ include "root.issuer" . }}
   CORS_ALLOWED_ORIGINS: https://{{ $denHost }}
-  KEYCLOAK_ADMIN_URL: https://keycloak.conservices-identity.svc.cluster.local:8443
+  # Den keeps the realm display name equal to the organisation name;
+  # empty turns that off (keycloak.realm.denDisplayNameSync).
+  KEYCLOAK_ADMIN_URL: {{ ternary "https://keycloak.conservices-identity.svc.cluster.local:8443" "" $v.keycloak.realm.denDisplayNameSync | quote }}
   {{- include "root.appS3Config" (dict "s3" $s3 "bucket" (printf "%s-conservices-den" $s3.prefix)) | nindent 2 }}
 # The enabled modules, listed unpaired on Den's Modules page from the first
 # start (DEN_PREREGISTER_MODULES). Den adds new slugs and never changes or

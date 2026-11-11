@@ -89,6 +89,13 @@ modules:
 # keycloak:
 #   host: auth            # sign-in
 #   adminHost: auth-admin # admin console, internal Gateway only
+#   # Sign-in protection of both realms, used at the first import only
+#   # (defaults: lockout after 10 failures, passwords of 12+ characters):
+#   realm:
+#     bruteForce: { failureFactor: 5 }
+#     passwordPolicy: { minLength: 14 }
+#     # false: Den may not write the realm; set its display name yourself.
+#     denDisplayNameSync: false
 
 # Name of the root Application install-root creates (default
 # conservices-stack):

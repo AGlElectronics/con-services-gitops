@@ -108,6 +108,11 @@ spec:
               allowPrivilegeEscalation: false
               capabilities:
                 drop: ["ALL"]
+            env:
+              # The login theme's brand.js fetches the brand from Den's
+              # public endpoint in the browser (theme property denPublicUrl).
+              - name: DEN_PUBLIC_URL
+                value: https://{{ .Values.appHosts.den }}.{{ .Values.domain }}
             volumeMounts:
               # sslrootcert of the JDBC URL.
               - name: internal-ca

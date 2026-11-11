@@ -1,6 +1,6 @@
 <#macro content>
-<#-- Brand pushed into the realm by Den (attribute conservicesBrand); read by js/brand.js. -->
-<#if (realm.attributes["conservicesBrand"])??>
-<div id="cs-brand" hidden data-brand="${realm.attributes["conservicesBrand"]}"></div>
+<#-- js/brand.js fetches the brand from Den's public endpoint (theme property denPublicUrl, from DEN_PUBLIC_URL). -->
+<#if (properties.denPublicUrl)?has_content>
+<div id="cs-brand" hidden data-den-url="${properties.denPublicUrl}"></div>
 </#if>
 </#macro>

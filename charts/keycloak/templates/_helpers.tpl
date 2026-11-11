@@ -12,6 +12,17 @@
 {{- toYaml $out }}
 {{- end }}
 
+{{/* Keycloak password policy string from realm.passwordPolicy. */}}
+{{- define "keycloak.passwordPolicy" -}}
+{{- $p := .Values.realm.passwordPolicy }}
+{{- if lt (int $p.minLength) 8 }}{{ fail "keycloak realm.passwordPolicy.minLength must be 8 or more" }}{{ end }}
+{{- $parts := list (printf "length(%d)" (int $p.minLength)) }}
+{{- if $p.notUsername }}{{ $parts = append $parts "notUsername" }}{{ end }}
+{{- if $p.notEmail }}{{ $parts = append $parts "notEmail" }}{{ end }}
+{{- with $p.extra }}{{ $parts = append $parts . }}{{ end }}
+{{- join " and " $parts }}
+{{- end }}
+
 {{/* The realm's mail server, only with smtp.enabled. Argument: dict root, displayName. */}}
 {{- define "keycloak.smtpServer" -}}
 {{- if .root.Values.smtp.enabled }}

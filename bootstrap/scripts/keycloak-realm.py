@@ -1,34 +1,51 @@
 #!/usr/bin/env python3
-"""Regenerate the Keycloak realm templates of charts/keycloak.
-
-For maintainers of this template, not for operators: the realm templates are
-already in charts/keycloak/templates/ and take the domain and SMTP setting
-from cluster.yaml. Run this only after the development realms of the main
-repository change.
+"""Generate the production Keycloak realms from the development realms.
 
 Reads infra/keycloak/realm-conservices.json and realm-attendees.json of the
-main repository and writes KeycloakRealmImport templates:
+main repository and writes production realms in one of two formats:
 
-  - same realm settings, roles, groups, clients and protocol mappers;
+  --format helm (default; maintainers of this template only)
+      KeycloakRealmImport templates in charts/keycloak/templates/. They are
+      already in this repository and take the domain, the hosts, the
+      password policy and the brute-force settings from cluster.yaml. Run
+      this only after the development realms of the main repository change.
+
+  --format json (operators of the Docker production path)
+      Plain realm files for `kc.sh start --import-realm`, with your domain
+      filled in, written to --out (default ./realm). Keycloak fills the
+      ${...} placeholders from its environment at import.
+
+Both formats give:
+
+  - the same realm settings, groups, clients and protocol mappers;
   - NO users, except the service-account users that carry the
     realm-management roles of the confidential clients;
+  - no realm roles "admin" and "member" (nothing reads them; access is
+    group based);
+  - den-keycloak with realm-management "manage-realm" only (Den keeps the
+    realm display name equal to the organisation name; Keycloak has no
+    smaller role that may write it), or with no role at all when the
+    display-name sync is off;
   - redirect URIs and web origins on https://<host>.<domain> only (no
-    localhost); the domain is the Helm value .Values.domain and each app's
-    host label the value .Values.appHosts.<label>, where <label> is the
-    app's sub-domain in the development realm (den, stash, events, submit,
-    ...); cluster.yaml sets them (den.host, modules.<name>.host, ...);
+    localhost); helm: the domain is the Helm value .Values.domain and each
+    app's host label the value .Values.appHosts.<label>, where <label> is
+    the app's sub-domain in the development realm (den, stash, events,
+    submit, ...); cluster.yaml sets them (den.host, modules.<name>.host);
   - direct access grants (password grant) off for the public *-spa clients;
-  - client secrets and the SMTP login as ${PLACEHOLDERS}, filled by the
-    Keycloak Operator from the Secret keycloak-realm-secrets (OpenBao
-    conservices/infra/keycloak/clients and conservices/infra/keycloak/smtp);
-    the SMTP block only with .Values.smtp.enabled;
+  - client secrets and the SMTP login as ${PLACEHOLDERS}: helm fills them
+    from the Secret keycloak-realm-secrets (OpenBao
+    conservices/infra/keycloak/clients and conservices/infra/keycloak/smtp),
+    json from Keycloak's environment variables of the same name;
   - sslRequired "all";
-  - self-registration off in the staff realm "conservices".
+  - self-registration off in the staff realm "conservices";
+  - brute-force protection on and a password policy (minimum length, not
+    the username, not the e-mail address) in both realms.
 
-Usage (from the root of this repository, main repository checked out next
-to it):
+Usage (main repository checked out next to this one):
 
   python3 bootstrap/scripts/keycloak-realm.py --source ../con-services/infra/keycloak
+  python3 bootstrap/scripts/keycloak-realm.py --source ../con-services/infra/keycloak \\
+      --format json --domain con.example.org --out ./realm --smtp
 
 Needs PyYAML (pip install pyyaml). A realm import only creates a realm that
 does not exist yet; see deploy/identity.md for changing a running realm.
@@ -61,6 +78,34 @@ CLIENT_SECRETS = {
 # Staff accounts are created by HR (hr-provisioner), never by self-service
 # sign-up. The attendees realm keeps registration on (Rally's submissions).
 STAFF_REALMS = {"conservices"}
+
+# Realm roles of the development realm that nothing reads.
+UNUSED_REALM_ROLES = {"admin", "member"}
+
+# The only realm-management role den-keycloak keeps (PUT /admin/realms/<realm>
+# for the display name needs it).
+DEN_KEYCLOAK_ROLES = ["manage-realm"]
+
+# Brute-force settings, in Keycloak's realm attribute names. The helm format
+# reads each from .Values.realm.bruteForce.<key>.
+BRUTE_FORCE_DEFAULTS = {
+    "permanentLockout": False,
+    "failureFactor": 10,
+    "waitIncrementSeconds": 60,
+    "maxFailureWaitSeconds": 900,
+    "maxDeltaTimeSeconds": 43200,
+    "minimumQuickLoginWaitSeconds": 60,
+    "quickLoginCheckMilliSeconds": 1000,
+}
+
+# Values the helm format leaves to Helm: token -> template expression.
+HELM_TOKENS = {
+    "__BRUTE_FORCE_ENABLED__": "{{ .Values.realm.bruteForce.enabled }}",
+    "__PASSWORD_POLICY__": '{{ include "keycloak.passwordPolicy" . | quote }}',
+    "__DEN_KEYCLOAK_ROLES__": '{{ ternary (list "manage-realm") (list) .Values.realm.denDisplayNameSync | toJson }}',
+}
+for _key in BRUTE_FORCE_DEFAULTS:
+    HELM_TOKENS[f"__BRUTE_{_key}__"] = "{{ .Values.realm.bruteForce." + _key + " }}"
 
 TEMPLATE = """\
 {{{{- /*
@@ -108,7 +153,46 @@ def fix_client(client, used):
     return client
 
 
-def transform(realm):
+def password_policy(min_length, not_username, not_email, extra):
+    parts = [f"length({min_length})"]
+    if not_username:
+        parts.append("notUsername")
+    if not_email:
+        parts.append("notEmail")
+    if extra:
+        parts.append(extra)
+    return " and ".join(parts)
+
+
+def harden(realm, opts):
+    """Brute-force protection, password policy, no unused roles, den-keycloak's roles."""
+    roles = realm.get("roles", {})
+    if "realm" in roles:
+        roles["realm"] = [r for r in roles["realm"] if r.get("name") not in UNUSED_REALM_ROLES]
+        if not roles["realm"]:
+            del roles["realm"]
+    if "roles" in realm and not realm["roles"]:
+        del realm["roles"]
+    for user in realm.get("users", []):
+        user.pop("realmRoles", None)
+        if user.get("serviceAccountClientId") == "den-keycloak":
+            if opts.format == "helm":
+                user["clientRoles"] = {"realm-management": "__DEN_KEYCLOAK_ROLES__"}
+            else:
+                user["clientRoles"] = {"realm-management": DEN_KEYCLOAK_ROLES if opts.den_sync else []}
+    if opts.format == "helm":
+        realm["bruteForceProtected"] = "__BRUTE_FORCE_ENABLED__"
+        for key in BRUTE_FORCE_DEFAULTS:
+            realm[key] = f"__BRUTE_{key}__"
+        realm["passwordPolicy"] = "__PASSWORD_POLICY__"
+    else:
+        realm["bruteForceProtected"] = True
+        realm.update(BRUTE_FORCE_DEFAULTS)
+        realm["failureFactor"] = opts.failure_factor
+        realm["passwordPolicy"] = password_policy(opts.min_length, True, True, "")
+
+
+def transform(realm, opts, smtp_display=None):
     realm = copy.deepcopy(realm)
     used = {}
     realm["users"] = [u for u in realm.get("users", []) if u.get("serviceAccountClientId")]
@@ -121,7 +205,19 @@ def transform(realm):
     if realm.get("realm") in STAFF_REALMS:
         realm["registrationAllowed"] = False
     realm.pop("smtpServer", None)
-    return json.loads(DEV_HOST.sub(host_token, json.dumps(realm)).replace(DEV_DOMAIN, DOMAIN_TOKEN)), used
+    if smtp_display is not None:
+        realm["smtpServer"] = {
+            "host": "${SMTP_HOST}", "port": "${SMTP_PORT}", "from": "${SMTP_FROM}",
+            "fromDisplayName": smtp_display, "auth": "true", "user": "${SMTP_USERNAME}",
+            "password": "${SMTP_PASSWORD}", "starttls": "true", "ssl": "false",
+        }
+    harden(realm, opts)
+    text = json.dumps(realm)
+    if opts.format == "helm":
+        text = DEV_HOST.sub(host_token, text).replace(DEV_DOMAIN, DOMAIN_TOKEN)
+    else:
+        text = DEV_HOST.sub(lambda m: host_name(m, opts), text).replace(DEV_DOMAIN, opts.domain)
+    return json.loads(text), used
 
 
 def host_token(match):
@@ -132,33 +228,94 @@ def host_token(match):
     return "{{.Values.appHosts." + label + "}}." + DOMAIN_TOKEN
 
 
+def host_name(match, opts):
+    label = match.group(1)
+    if label not in APP_HOSTS:
+        sys.exit(f"host {match.group(0)!r} is not a known app host; add {label!r} to APP_HOSTS")
+    return f"{opts.hosts.get(label, label)}.{opts.domain}"
+
+
+def write_helm(realm, used, filename, name, display):
+    body = yaml.safe_dump(realm, sort_keys=False, allow_unicode=True, width=float("inf"))
+    for token, expr in HELM_TOKENS.items():
+        body = body.replace(token, expr)
+    left = re.findall(r"__[A-Z][A-Za-z_]*__", body)
+    if left:
+        sys.exit(f"unreplaced token in {name}: {left}")
+    body = "".join("    " + line + "\n" for line in body.splitlines())
+    clients = "".join(f' "{p}" "{cid}"' for p, cid in sorted(used.items()))
+    target = OUT / f"realm-{name}.yaml"
+    target.write_text(
+        TEMPLATE.format(source=filename, name=name, display=json.dumps(display),
+                        clients=clients, realm=body),
+        encoding="utf-8",
+        newline="\n",
+    )
+    return target
+
+
+def write_json(realm, out, name):
+    out.mkdir(parents=True, exist_ok=True)
+    target = out / f"realm-{name}.json"
+    target.write_text(json.dumps(realm, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+    return target
+
+
+def parse_hosts(values):
+    hosts = {}
+    for item in values or []:
+        label, sep, host = item.partition("=")
+        if not sep or label not in APP_HOSTS or not re.fullmatch(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?", host):
+            sys.exit(f"--host {item!r}: expected <label>=<host label>, label one of {sorted(APP_HOSTS)}")
+        hosts[label] = host
+    return hosts
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--source", required=True, help="path to the main repository's infra/keycloak")
-    args = parser.parse_args()
+    parser.add_argument("--format", choices=["helm", "json"], default="helm")
+    parser.add_argument("--domain", help="json: your domain, e.g. con.example.org")
+    parser.add_argument("--host", action="append", dest="hosts", metavar="LABEL=HOST",
+                        help="json: another host label for an app, e.g. den=portal (repeatable)")
+    parser.add_argument("--out", default="realm", help="json: output folder (default ./realm)")
+    parser.add_argument("--smtp", action="store_true",
+                        help="json: add a mail server from ${SMTP_HOST}, ${SMTP_PORT}, ${SMTP_FROM}, "
+                             "${SMTP_USERNAME}, ${SMTP_PASSWORD}")
+    parser.add_argument("--min-password-length", dest="min_length", type=int, default=12,
+                        help="json: password policy minimum length (default 12)")
+    parser.add_argument("--failure-factor", type=int, default=BRUTE_FORCE_DEFAULTS["failureFactor"],
+                        help="json: failed sign-ins before a temporary lockout (default 10)")
+    parser.add_argument("--no-den-sync", dest="den_sync", action="store_false",
+                        help="json: den-keycloak gets no realm-management role (Den does not sync the "
+                             "realm display name)")
+    opts = parser.parse_args()
+    if opts.format == "json":
+        if not opts.domain or not re.fullmatch(r"[a-z0-9.-]+\.[a-z]{2,}", opts.domain):
+            sys.exit("--format json needs --domain, e.g. --domain con.example.org")
+        if opts.min_length < 8:
+            sys.exit("--min-password-length must be 8 or more")
+    opts.hosts = parse_hosts(opts.hosts)
 
-    src = pathlib.Path(args.source)
+    src = pathlib.Path(opts.source)
     jobs = [
         ("realm-conservices.json", "conservices", "Con Services"),
         ("realm-attendees.json", "attendees", "Attendee login"),
     ]
     for filename, name, display in jobs:
         dev = json.loads((src / filename).read_text(encoding="utf-8"))
-        realm, used = transform(dev)
         if "{{" in json.dumps(dev):
             sys.exit(f"{filename} contains '{{{{', which Helm would read as a template")
-        body = yaml.safe_dump(realm, sort_keys=False, allow_unicode=True, width=float("inf"))
-        body = "".join("    " + line + "\n" for line in body.splitlines())
-        clients = "".join(f' "{p}" "{cid}"' for p, cid in sorted(used.items()))
-        target = OUT / f"realm-{name}.yaml"
-        target.write_text(
-            TEMPLATE.format(source=filename, name=name, display=json.dumps(display),
-                            clients=clients, realm=body),
-            encoding="utf-8",
-            newline="\n",
-        )
+        smtp = display if (opts.format == "json" and opts.smtp) else None
+        realm, used = transform(dev, opts, smtp)
+        if opts.format == "helm":
+            target = write_helm(realm, used, filename, name, display)
+        else:
+            target = write_json(realm, pathlib.Path(opts.out), name)
         users = [u["username"] for u in realm.get("users", [])]
-        print(f"wrote {target} ({len(realm.get('clients', []))} clients, users kept: {users or 'none'})")
+        placeholders = sorted(set(re.findall(r"\$\{([A-Z_]+)\}", json.dumps(realm))))
+        print(f"wrote {target} ({len(realm.get('clients', []))} clients, users kept: {users or 'none'}, "
+              f"placeholders: {placeholders or 'none'})")
 
 
 if __name__ == "__main__":

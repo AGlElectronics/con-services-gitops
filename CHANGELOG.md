@@ -103,7 +103,10 @@ First release of the template (1.0.0).
   sign-in route limited to `/realms/` and `/resources/`, the admin console
   on the internal Gateway, the Con Services login theme, and production
   realm imports (`conservices` and the attendee realm) without test users,
-  localhost URIs or development secrets.
+  localhost URIs or development secrets. The login theme fetches the brand
+  from Den's public brand endpoint in the browser (`DEN_PUBLIC_URL` on
+  Keycloak is set to Den's address). The staff realm has the group
+  `den-ops` (who may run backups and drop databases in Den).
 - PostgreSQL 16.15 cluster `conservices-pg` (`charts/postgres`) on the
   cluster's CloudNativePG: 3 instances on different nodes, quorum
   synchronous replication, TLS-only access with one login per database,
@@ -138,8 +141,35 @@ First release of the template (1.0.0).
   is part of the seed plan, and a check that no installation-specific data
   is committed.
 - Test renders for Den only, without the OpenBao setup Job, the small
-  profile and custom host names, and cases the root chart must reject (a
-  module MAJOR that differs from Den's, invalid or duplicate host names).
+  profile, custom host names, and backups on the same S3 service with
+  custom realm settings, and cases the root chart must reject (a module
+  MAJOR that differs from Den's, invalid or duplicate host names, a
+  password policy under 8 characters).
+
+### Changed
+
+- **BREAKING:** the realm imports now turn on brute-force protection
+  (temporary lockout after 10 failed sign-ins) and a password policy (at
+  least 12 characters, not the username, not the e-mail address) in both
+  realms, configurable under `keycloak.realm` in `cluster.yaml`; drop the
+  unused realm roles `admin` and `member`; and give `den-keycloak` only
+  `manage-realm` (Den now only keeps the realm display name in line; the
+  login theme pulls the brand from Den), or no role with
+  `keycloak.realm.denDisplayNameSync: false`. A `KeycloakRealmImport`
+  only creates a realm that does not exist yet, so a cluster installed
+  from an earlier commit of this template keeps its old realm. Make the
+  same changes by hand in the admin console (`https://auth-admin.<domain>`,
+  realm *conservices*, then again for *attendees*):
+  1. **Realm settings → Security defenses → Brute force detection:**
+     *Lockout temporarily*, *Max login failures* 10, *Wait increment*
+     1 minute, *Max wait* 15 minutes, *Failure reset time* 12 hours.
+  2. **Authentication → Policies → Password policy:** add *Minimum length*
+     12, *Not username* and *Not email*; **Save**.
+  3. **Realm roles:** delete `admin` and `member` (staff realm only).
+  4. **Users → service-account-den-keycloak → Role mapping:** select
+     `view-realm` and **Unassign** it. Keep `manage-realm`, or unassign it
+     too if you set `denDisplayNameSync: false` (staff realm only).
+  Details: [Changing a running realm](https://aglelectronics.github.io/con-services/deploy/identity/#changing-a-running-realm).
 
 ### Security
 
@@ -152,6 +182,9 @@ First release of the template (1.0.0).
 - Default-deny NetworkPolicies and Pod Security labels in every Con
   Services namespace; PostgreSQL reaches S3 only by host name (Cilium
   `toFQDNs`).
+- Keycloak realms: brute-force protection and a password policy by
+  default, no unused realm roles, and `den-keycloak` reduced to the one
+  role it needs (`manage-realm`), or none.
 - The bootstrap scripts pass tokens and secret values on standard input,
   never on a command line, never print a value (hidden answers show only
   their length and first and last four characters), and never store the

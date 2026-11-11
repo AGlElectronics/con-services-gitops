@@ -1,7 +1,9 @@
-// Applies the brand Den pushed into the realm (rendered by footer.ftl as
-// #cs-brand) to the login page: name, tagline, logo, colours, favicon and
-// the background picture.
-// Without it the neutral defaults from css/conservices.css stay.
+// Fetches the brand from Den (GET <Den>/api/v1/public/brand; Den's address is
+// the data-den-url of #cs-brand, rendered by footer.ftl) and applies it to the
+// login page: name, tagline, logo, colours, favicon and the background
+// picture. The last answer is cached in localStorage and applied at once on
+// the next visit. Without Den the neutral defaults from css/conservices.css
+// stay. See den/docs/adr/0008-keycloak-branding-pull.md.
 (function () {
   function hexToHsl(v) {
     if (typeof v !== 'string') return null;
@@ -148,8 +150,12 @@
   // Picture behind the form: "panel" docks the form on the right (centred
   // card on narrow screens), "centered" keeps the card over a dimmed picture.
   function applyBackground(b) {
-    if (typeof b.background_url !== 'string' || !b.background_url) return;
     var root = document.documentElement;
+    root.classList.remove('cs-has-bg', 'cs-layout-centered', 'cs-layout-panel');
+    root.style.removeProperty('--cs-login-image');
+    var old = document.querySelector('.pf-v5-c-login .cs-caption');
+    if (old) old.remove();
+    if (typeof b.background_url !== 'string' || !b.background_url) return;
     root.style.setProperty('--cs-login-image', 'url(' + JSON.stringify(b.background_url) + ')');
     root.classList.add('cs-has-bg', b.login_layout === 'centered' ? 'cs-layout-centered' : 'cs-layout-panel');
     var caption = (b.login_caption || '').trim();
@@ -162,20 +168,71 @@
     }
   }
 
-  function apply() {
-    var el = document.getElementById('cs-brand');
-    if (!el) return;
-    var b;
-    try {
-      b = JSON.parse(el.getAttribute('data-brand') || '');
-    } catch (e) {
-      return;
-    }
-    if (!b || typeof b !== 'object') return;
+  var CACHE_KEY = 'conservices-brand';
+
+  // Den's public bundle → what the functions above expect. Asset URLs are
+  // relative to Den.
+  function fromBundle(bundle, den) {
+    var copy = bundle.copy && typeof bundle.copy === 'object' ? bundle.copy : {};
+    var abs = function (u) {
+      if (typeof u !== 'string' || !u) return '';
+      try {
+        var url = new URL(u, den);
+        return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : '';
+      } catch (e) {
+        return '';
+      }
+    };
+    var str = function (v) { return typeof v === 'string' ? v.trim() : ''; };
+    return {
+      revision: bundle.revision,
+      organization_name: str(bundle.organization_name),
+      tagline: str(copy.tagline),
+      theme: bundle.theme && typeof bundle.theme === 'object' ? bundle.theme : {},
+      logo_url: abs(bundle.logo_url),
+      favicon_url: abs(bundle.favicon_url),
+      background_url: abs(bundle.login_background_url),
+      login_layout: str(copy.login_layout),
+      login_caption: str(copy.login_caption)
+    };
+  }
+
+  function applyAll(b) {
     applyColours(b.theme || {});
     applyHeader(b);
     applyFavicon(b);
     applyBackground(b);
+  }
+
+  function apply() {
+    var el = document.getElementById('cs-brand');
+    var den = el && (el.getAttribute('data-den-url') || '').replace(/\/+$/, '');
+    if (!den) return;
+    var cached = null;
+    try {
+      cached = JSON.parse(window.localStorage.getItem(CACHE_KEY) || 'null');
+    } catch (e) {
+      cached = null;
+    }
+    if (cached && cached.den === den && cached.brand) applyAll(cached.brand);
+
+    if (!window.fetch) return;
+    fetch(den + '/api/v1/public/brand', { credentials: 'omit', headers: { Accept: 'application/json' } })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (bundle) {
+        if (!bundle || typeof bundle !== 'object') return;
+        var b = fromBundle(bundle, den);
+        try {
+          window.localStorage.setItem(CACHE_KEY, JSON.stringify({ den: den, brand: b }));
+        } catch (e) {
+          // storage full or disabled: the brand still applies this time
+        }
+        // The cached brand is already on the page unless something changed.
+        if (!cached || cached.den !== den || JSON.stringify(cached.brand) !== JSON.stringify(b)) applyAll(b);
+      })
+      .catch(function () {
+        // Den unreachable: keep the cached or neutral look; signing in still works.
+      });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);

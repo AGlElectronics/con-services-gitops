@@ -49,3 +49,12 @@ spec:
       attributes:
         pkce.code.challenge.method: S256
         post.logout.redirect.uris: https://{{.Values.appHosts.submit}}.{{.Values.domain}}/*
+    bruteForceProtected: {{ .Values.realm.bruteForce.enabled }}
+    permanentLockout: {{ .Values.realm.bruteForce.permanentLockout }}
+    failureFactor: {{ .Values.realm.bruteForce.failureFactor }}
+    waitIncrementSeconds: {{ .Values.realm.bruteForce.waitIncrementSeconds }}
+    maxFailureWaitSeconds: {{ .Values.realm.bruteForce.maxFailureWaitSeconds }}
+    maxDeltaTimeSeconds: {{ .Values.realm.bruteForce.maxDeltaTimeSeconds }}
+    minimumQuickLoginWaitSeconds: {{ .Values.realm.bruteForce.minimumQuickLoginWaitSeconds }}
+    quickLoginCheckMilliSeconds: {{ .Values.realm.bruteForce.quickLoginCheckMilliSeconds }}
+    passwordPolicy: {{ include "keycloak.passwordPolicy" . | quote }}

@@ -317,6 +317,37 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {"enabled": {"type": "boolean"}}
+        },
+        "realm": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "bruteForce": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "permanentLockout": {"type": "boolean"},
+                "failureFactor": {"type": "integer", "minimum": 1},
+                "waitIncrementSeconds": {"type": "integer", "minimum": 0},
+                "maxFailureWaitSeconds": {"type": "integer", "minimum": 0},
+                "maxDeltaTimeSeconds": {"type": "integer", "minimum": 0},
+                "minimumQuickLoginWaitSeconds": {"type": "integer", "minimum": 0},
+                "quickLoginCheckMilliSeconds": {"type": "integer", "minimum": 0}
+              }
+            },
+            "passwordPolicy": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "minLength": {"type": "integer", "minimum": 8},
+                "notUsername": {"type": "boolean"},
+                "notEmail": {"type": "boolean"},
+                "extra": {"type": "string"}
+              }
+            },
+            "denDisplayNameSync": {"type": "boolean"}
+          }
         }
       }
     }

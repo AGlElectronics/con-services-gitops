@@ -37,12 +37,6 @@ spec:
     accessTokenLifespan: 300
     ssoSessionIdleTimeout: 36000
     ssoSessionMaxLifespan: 86400
-    roles:
-      realm:
-      - name: admin
-        description: Org admin
-      - name: member
-        description: Standard member
     groups:
     - name: stash-admin
       path: /stash-admin
@@ -60,6 +54,8 @@ spec:
       path: /den-admin
     - name: den-member
       path: /den-member
+    - name: den-ops
+      path: /den-ops
     - name: events-admin
       path: /events-admin
     - name: hr-admin
@@ -99,9 +95,7 @@ spec:
       enabled: true
       serviceAccountClientId: den-keycloak
       clientRoles:
-        realm-management:
-        - manage-realm
-        - view-realm
+        realm-management: {{ ternary (list "manage-realm") (list) .Values.realm.denDisplayNameSync | toJson }}
     - username: service-account-learn-provisioner
       enabled: true
       serviceAccountClientId: learn-provisioner
@@ -395,3 +389,12 @@ spec:
       directAccessGrantsEnabled: false
       implicitFlowEnabled: false
       protocol: openid-connect
+    bruteForceProtected: {{ .Values.realm.bruteForce.enabled }}
+    permanentLockout: {{ .Values.realm.bruteForce.permanentLockout }}
+    failureFactor: {{ .Values.realm.bruteForce.failureFactor }}
+    waitIncrementSeconds: {{ .Values.realm.bruteForce.waitIncrementSeconds }}
+    maxFailureWaitSeconds: {{ .Values.realm.bruteForce.maxFailureWaitSeconds }}
+    maxDeltaTimeSeconds: {{ .Values.realm.bruteForce.maxDeltaTimeSeconds }}
+    minimumQuickLoginWaitSeconds: {{ .Values.realm.bruteForce.minimumQuickLoginWaitSeconds }}
+    quickLoginCheckMilliSeconds: {{ .Values.realm.bruteForce.quickLoginCheckMilliSeconds }}
+    passwordPolicy: {{ include "keycloak.passwordPolicy" . | quote }}
