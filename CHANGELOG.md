@@ -10,6 +10,8 @@ First release of the template (1.0.0).
 
 ### Added
 
+- Desk stores mail in its own bucket. `modules/desk/s3` is a manual OpenBao entry and `desk-secrets` receives `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`. Rendered Desk values enable S3 egress and Google API egress. `modules/desk/google` (`credentials.json`) is optional: leave it unset to run Desk on IMAP only. `DESK_SECRET_KEY_PREVIOUS` is filled from the optional `previous` property of `modules/desk/secret-key` while that key is rotated.
+
 - Learn's anonymous-feedback pepper is generated in OpenBao at
   `modules/learn/feedback-pepper` (property `pepper`) and copied into
   `learn-secrets` as `LEARN_FEEDBACK_PEPPER`. When HR is enabled, Learn's

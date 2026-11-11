@@ -33,6 +33,12 @@ spec:
         # Encrypts the Den credential the module stores (shared denlink).
         DEN_LINK_ENCRYPTION_KEY: "{{`{{ .denLinkKey }}`}}"
         DESK_SECRET_KEY: "{{`{{ .deskSecretKey }}`}}"
+        # Empty until you set property "previous" on modules/desk/secret-key (rotation).
+        DESK_SECRET_KEY_PREVIOUS: "{{`{{ .deskSecretPrevious }}`}}"
+        S3_ACCESS_KEY_ID: "{{`{{ .s3AccessKey }}`}}"
+        S3_SECRET_ACCESS_KEY: "{{`{{ .s3SecretKey }}`}}"
+        # Empty until modules/desk/google exists. Not an env var (the name is not one).
+        google-service-account.json: {{`{{ .googleSA | quote }}`}}
         {{- if has "hr" .Values.enabledModules }}
         # Same value as hr-secrets. HR reads this catalog with it.
         HR_SERVICE_TOKEN: "{{`{{ .hrServiceToken }}`}}"
@@ -50,6 +56,24 @@ spec:
       remoteRef:
         key: modules/desk/secret-key
         property: key
+    - secretKey: deskSecretPrevious
+      remoteRef:
+        key: modules/desk/secret-key
+        property: previous
+        optional: true
+    - secretKey: s3AccessKey
+      remoteRef:
+        key: modules/desk/s3
+        property: access_key
+    - secretKey: s3SecretKey
+      remoteRef:
+        key: modules/desk/s3
+        property: secret_key
+    - secretKey: googleSA
+      remoteRef:
+        key: modules/desk/google
+        property: credentials.json
+        optional: true
     {{- if has "hr" .Values.enabledModules }}
     - secretKey: hrServiceToken
       remoteRef:

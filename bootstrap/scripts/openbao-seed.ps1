@@ -168,6 +168,7 @@ $checks = @{
     password   = @(, @('password', 'smtp-password', $false))
     cloudflare = @(, @('api-token', 'cloudflare', $false))
     ghcr       = @(@('username', 'text', $false), @('token', 'ghcr-token', $false))
+    google     = @()
 }
 # Checks an existing entry the same way as typed answers, so a broken value
 # (a failed paste stored as "\") shows up. Only the reason is printed.
@@ -255,6 +256,16 @@ function Request-Cloudflare($e) {
     return $true
 }
 
+function Request-Google($e) {
+    $path = Read-ConValue -Prompt '  Path to the service-account JSON (empty = skip; Desk stays on IMAP)' -Kind 'text' -Optional
+    if (-not $path) { return $false }
+    if (-not (Test-Path -LiteralPath $path)) { Write-Bad "No file at that path."; return $false }
+    $json = Get-Content -LiteralPath $path -Raw
+    Set-KvEntry $Token $e.path ([ordered]@{ 'credentials.json' = $json.Trim() })
+    $json = $null
+    return $true
+}
+
 function Request-Ghcr($e) {
     $user = Read-ConValue -Prompt '  GitHub user name (empty = skip)' -Kind 'text' -Optional
     if (-not $user) { return $false }
@@ -272,6 +283,7 @@ $sections = @{
     password   = 'Stash SMTP password (optional)'
     cloudflare = "Cloudflare API token (Let's Encrypt DNS-01)"
     ghcr       = 'GitHub Container Registry (private images)'
+    google     = 'Google Workspace service account for Desk (optional)'
 }
 $current = ''
 foreach ($e in $entries) {
@@ -306,6 +318,7 @@ foreach ($e in $entries) {
         'password' { Request-Password $e }
         'cloudflare' { Request-Cloudflare $e }
         'ghcr' { Request-Ghcr $e }
+        'google' { Request-Google $e }
     }
     if ($ok) {
         Write-Good "$Kv/$p written"

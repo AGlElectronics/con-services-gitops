@@ -49,6 +49,10 @@ networkPolicy:
         fqdns: {{ toJson .fqdns }}
         port: 443
       {{- end }}
+  {{- if .google }}
+  google:
+    enabled: true
+  {{- end }}
 {{- end }}
 
 {{/* S3 settings of an app's config. Argument: dict s3 (root.s3 as dict), bucket. */}}
@@ -161,6 +165,12 @@ frontend:
   securityHeaders:
     keycloakOrigin: https://{{ include "root.fqdn" (dict "root" $root "host" $root.Values.keycloak.host) }}
   {{- end }}
+  {{- if eq $n "desk" }}
+  securityHeaders:
+    keycloakOrigin: https://{{ include "root.fqdn" (dict "root" $root "host" $root.Values.keycloak.host) }}
+    denOrigin: https://{{ $denHost }}
+    s3Origin: {{ $s3.endpoint | quote }}
+  {{- end }}
 config:
   APP_BASE_URL: https://{{ $host }}
   OIDC_ISSUER_URL: {{ include "root.issuer" $root }}
@@ -205,7 +215,7 @@ submit:
     oidcClientId: rally-submit
     publicScheduleKey: ""
 {{- end }}
-{{ include "root.appCommon" (dict "root" $root "host" $host "s3" $meta.s3 "fqdns" $s3.fqdns) }}
+{{ include "root.appCommon" (dict "root" $root "host" $host "s3" $meta.s3 "fqdns" $s3.fqdns "google" (eq $n "desk")) }}
 {{- if eq $n "hr" }}
   {{- $egress := list }}
   {{- range $t := list "stash" "rally" "learn" "wiki" "tasks" "finance" "desk" }}

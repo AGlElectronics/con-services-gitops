@@ -218,6 +218,7 @@ section_of() {
     password) echo "Stash SMTP password (optional)" ;;
     cloudflare) echo "Cloudflare API token (Let's Encrypt DNS-01)" ;;
     ghcr) echo "GitHub Container Registry (private images)" ;;
+    google) echo "Google Workspace service account for Desk (optional)" ;;
   esac
 }
 
@@ -300,6 +301,15 @@ ask_password() {
   unset pass
 }
 
+ask_google() {
+  local p=${PATHS[$1]} f
+  prompt_value f "  Path to the service-account JSON (empty = skip; Desk stays on IMAP): " text 0 1 || return 1
+  [[ -n "$f" ]] || return 1
+  [[ -f "$f" ]] || { bad "No file at that path."; return 1; }
+  # Compact JSON on stdin. The key is not printed and is not a command argument.
+  jq -c . "$f" | put "$p" credentials.json || exit 1
+}
+
 ask_entry() {
   case "$1" in
     s3) ask_s3 "$2" ;;
@@ -308,6 +318,7 @@ ask_entry() {
     password) ask_password "$2" ;;
     cloudflare) ask_cloudflare "$2" ;;
     ghcr) ask_ghcr "$2" ;;
+    google) ask_google "$2" ;;
     *) bad "unknown kind of entry: $1"; return 1 ;;
   esac
 }

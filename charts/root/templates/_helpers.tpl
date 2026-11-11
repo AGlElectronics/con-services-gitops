@@ -15,7 +15,7 @@ rally:   { role: events,  label: events,  slug: events,  title: Rally,   s3: tru
 finance: { role: finance, label: finance, slug: finance, title: Finance, s3: true,  migrate: true,  access: false }
 learn:   { role: learn,   label: learn,   slug: learn,   title: Learn,   s3: true,  migrate: true,  access: true }
 wiki:    { role: wiki,    label: wiki,    slug: wiki,    title: Wiki,    s3: true,  migrate: true,  access: true }
-desk:    { role: desk,    label: desk,    slug: desk,    title: Desk,    s3: false, migrate: true,  access: true }
+desk:    { role: desk,    label: desk,    slug: desk,    title: Desk,    s3: true,  migrate: true,  access: true }
 tasks:   { role: tasks,   label: tasks,   slug: tasks,   title: Tasks,   s3: true,  migrate: true,  access: true }
 {{- end }}
 
@@ -139,6 +139,10 @@ that stay Degraded without it, and what the value is.
 {{- if has "stash" $enabled }}
 {{- $manual = append $manual (dict "path" "modules/stash/smtp" "kind" "password" "fields" (list "password") "apps" (list "stash") "optional" true
     "what" "Password of the SMTP server in Stash settings. Leave it unset to send mail without a login.") }}
+{{- end }}
+{{- if has "desk" $enabled }}
+{{- $manual = append $manual (dict "path" "modules/desk/google" "kind" "google" "fields" (list "credentials.json") "apps" (list "desk") "optional" true
+    "what" "Google Workspace service-account key (JSON) for Desk. Leave it unset to use IMAP only. Also authorise the scopes on the Google Workspace page, and set networkPolicy.google (the GitOps values turn that on).") }}
 {{- end }}
 {{- if $v.keycloak.smtp.enabled }}
 {{- $manual = append $manual (dict "path" "infra/keycloak/smtp" "kind" "smtp"
