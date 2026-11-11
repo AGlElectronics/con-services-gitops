@@ -24,6 +24,13 @@ spec:
       backendRefs:
         - name: keycloak-public
           port: 443
+      # HSTS: browsers use only HTTPS for this host (TLS ends at the Gateway).
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: Strict-Transport-Security
+                value: max-age=31536000; includeSubDomains
       timeouts:
         request: 60s
 ---
@@ -47,6 +54,13 @@ spec:
         - name: keycloak-public
           namespace: conservices-identity
           port: 443
+      # HSTS: browsers use only HTTPS for this host (TLS ends at the Gateway).
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: Strict-Transport-Security
+                value: max-age=31536000; includeSubDomains
 ---
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant

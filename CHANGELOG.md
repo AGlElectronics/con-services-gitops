@@ -192,6 +192,10 @@ First release of the template (1.0.0).
 - Default-deny NetworkPolicies and Pod Security labels in every Con
   Services namespace; PostgreSQL reaches S3 only by host name (Cilium
   `toFQDNs`).
+- HSTS at the Gateway: the Keycloak routes (public sign-in and admin
+  console) and the admin routes set `Strict-Transport-Security:
+  max-age=31536000; includeSubDomains`; Den and the modules get it from
+  their charts (`route.responseHeaders`).
 - Keycloak realms: brute-force protection and a password policy by
   default, no unused realm roles, and `den-keycloak` reduced to the one
   role it needs (`manage-realm`), or none.
