@@ -36,7 +36,7 @@ acme:
 
 s3:
   # Managed S3-compatible object storage for files (Den, Stash, Rally,
-  # Learn, Wiki, Tasks). HTTPS URL without bucket name.
+  # Finance, Learn, Wiki, Tasks). HTTPS URL without bucket name.
   endpoint: change-me
   region: change-me
   # true: https://<endpoint>/<bucket> (path style). false: virtual-host

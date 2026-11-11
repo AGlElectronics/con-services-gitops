@@ -1,7 +1,8 @@
 {{- if eq .Values.app "finance" }}
 # Secrets of Finance in conservices-finance, built by External Secrets from OpenBao
 # (ClusterSecretStore "openbao", KV v2 at "conservices", openbao.kvPath). Nothing secret is in Git.
-# Its values are random and created by External Secrets (charts/secret-store).
+# Random values are created by External Secrets (charts/secret-store); S3
+# keys are entered by you (bootstrap/scripts/openbao-seed.sh).
 # Inventory: https://aglelectronics.github.io/con-services/operations/secrets/
 #
 # DATABASE_URL: the role's password comes from the same OpenBao entry that
@@ -28,6 +29,9 @@ spec:
         DATABASE_URL: "postgres://finance:{{`{{ .dbPassword }}`}}@conservices-pg-rw.conservices-data.svc.cluster.local:5432/finance?sslmode=verify-full&sslrootcert=/etc/conservices-internal-ca/ca.crt"
         # Encrypts the Den credential the module stores (shared denlink).
         DEN_LINK_ENCRYPTION_KEY: "{{`{{ .denLinkKey }}`}}"
+        # Invoice PDFs and receipts in <prefix>-conservices-finance.
+        S3_ACCESS_KEY_ID: "{{`{{ .s3AccessKey }}`}}"
+        S3_SECRET_ACCESS_KEY: "{{`{{ .s3SecretKey }}`}}"
   data:
     - secretKey: denLinkKey
       remoteRef:
@@ -37,4 +41,12 @@ spec:
       remoteRef:
         key: infra/postgres/roles/finance
         property: password
+    - secretKey: s3AccessKey
+      remoteRef:
+        key: modules/finance/s3
+        property: access_key
+    - secretKey: s3SecretKey
+      remoteRef:
+        key: modules/finance/s3
+        property: secret_key
 {{- end }}

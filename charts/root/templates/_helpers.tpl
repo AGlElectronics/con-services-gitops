@@ -12,7 +12,7 @@ The host label is a setting (modules.<name>.host).
 stash:   { role: stash,   label: stash,   slug: stash,   title: Stash,   s3: true,  migrate: false, access: true }
 hr:      { role: hr,      label: hr,      slug: hr,      title: HR,      s3: false, migrate: true,  access: false }
 rally:   { role: events,  label: events,  slug: events,  title: Rally,   s3: true,  migrate: true,  access: true }
-finance: { role: finance, label: finance, slug: finance, title: Finance, s3: false, migrate: true,  access: false }
+finance: { role: finance, label: finance, slug: finance, title: Finance, s3: true,  migrate: true,  access: false }
 learn:   { role: learn,   label: learn,   slug: learn,   title: Learn,   s3: true,  migrate: true,  access: true }
 wiki:    { role: wiki,    label: wiki,    slug: wiki,    title: Wiki,    s3: true,  migrate: true,  access: true }
 desk:    { role: desk,    label: desk,    slug: desk,    title: Desk,    s3: false, migrate: true,  access: true }

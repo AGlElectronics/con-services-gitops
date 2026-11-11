@@ -180,6 +180,18 @@ First release of the template (1.0.0).
      `view-realm` and **Unassign** it. Keep `manage-realm`, or unassign it
      too if you set `denDisplayNameSync: false` (staff realm only).
   Details: [Changing a running realm](https://aglelectronics.github.io/con-services/deploy/identity/#changing-a-running-realm).
+- **BREAKING:** Finance now stores files (invoice PDFs, receipts) in its
+  own bucket `<bucketPrefix>-conservices-finance`. Enabling Finance asks
+  for an S3 key at `conservices/modules/finance/s3` (`access_key`,
+  `secret_key`, read and write on that bucket only), which
+  `finance-secrets` passes as `S3_ACCESS_KEY_ID` and
+  `S3_SECRET_ACCESS_KEY`; Finance gets `S3_ENDPOINT`, `S3_REGION`,
+  `S3_BUCKET` and `S3_USE_PATH_STYLE`, a Cilium egress rule to
+  `s3.fqdns`, and Den backs the bucket up. If Finance is already enabled:
+  create the bucket and the key at your provider, add the bucket to the
+  read-only key at `conservices/modules/den/files-s3`, then run
+  `bootstrap/scripts/openbao-seed.sh` (or `.ps1`) again; until then the
+  Finance Application stays *Degraded* (its Secret cannot be built).
 
 ### Security
 
