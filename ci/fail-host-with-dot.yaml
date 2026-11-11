@@ -1,0 +1,6 @@
+# Laid over examples/cluster.example-filled.yaml by CI: must FAIL, a host
+# label with a dot (the wildcard certificate covers one level only). The
+# schema rejects it before the chart's own check.
+# expect: /den/host
+den:
+  host: den.eu

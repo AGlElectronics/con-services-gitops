@@ -23,8 +23,9 @@ spec:
   primaryUpdateStrategy: unsupervised
   primaryUpdateMethod: switchover
 
-  # CloudNativePG creates the PodDisruptionBudgets itself.
-  enablePDB: true
+  # CloudNativePG creates the PodDisruptionBudgets itself (off with the
+  # small profile: a single instance's budget blocks node drains).
+  enablePDB: {{ .Values.podDisruptionBudget }}
 
   # The network policies select PostgreSQL pods by this label. A restore
   # cluster must carry it too.
@@ -92,11 +93,12 @@ spec:
     size: {{ .Values.storage.walSize }}
     resizeInUseVolumes: true
 
-  # Required anti-affinity: never two instances on one node. With fewer
-  # nodes than instances, the extra instances stay Pending.
+  # Required anti-affinity (profile standard): never two instances on one
+  # node; with fewer nodes than instances, the extra instances stay Pending.
+  # Preferred (profile small): spread when possible.
   affinity:
     enablePodAntiAffinity: true
-    podAntiAffinityType: required
+    podAntiAffinityType: {{ .Values.podAntiAffinityType }}
     topologyKey: kubernetes.io/hostname
 
   resources:

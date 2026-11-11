@@ -20,7 +20,8 @@ env:
   KUBERNETES_VERSION: 1.37.0
   VALUES_FILE: examples/cluster.example-filled.yaml
   # Branch or tag of AGlElectronics/con-services whose charts are rendered.
-  # Pin it to the release in charts.targetRevision once that tag exists.
+  # Every app has its own chart tag (<app>/v<version>); main holds the
+  # newest chart of each.
   CHARTS_REF: main
 
 jobs:
@@ -114,6 +115,36 @@ jobs:
             echo "openbao-setup rendered although openbao.setup.enabled is false"; exit 1
           fi
 
+      - name: Small profile (1 or 2 nodes)
+        working-directory: gitops
+        run: |
+          set -euo pipefail
+          python ci/render.py --values "$VALUES_FILE" --values ci/small-profile.yaml \
+            --main-repo ../con-services --out build/rendered-small
+          python ci/check.py build/rendered-small --sizing
+          python ci/cases.py small build/rendered-small
+
+      - name: Custom host names and root Application name
+        working-directory: gitops
+        run: |
+          set -euo pipefail
+          python ci/render.py --values "$VALUES_FILE" --values ci/custom-hosts.yaml \
+            --main-repo ../con-services --out build/rendered-hosts
+          python ci/check.py build/rendered-hosts
+          python ci/cases.py hosts build/rendered-hosts
+
+      - name: Root chart rejects bad settings (version mismatch, hosts)
+        working-directory: gitops
+        run: python ci/cases.py failures
+
+      - name: PowerShell script parses
+        working-directory: gitops
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/bootstrap/install-root.ps1", [ref]$null, [ref]$errors) | Out-Null
+          if ($errors) { $errors | ForEach-Object { Write-Error $_.ToString() }; exit 1 }
+
       - name: Schemas (kubeconform, strict)
         working-directory: gitops
         run: |
@@ -121,6 +152,7 @@ jobs:
           python ci/crd-schemas.py build/rendered build/schemas
           kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSION" \
             -skip CustomResourceDefinition \
+            -ignore-filename-pattern 'seed-plan\.json$' \
             -schema-location default \
             -schema-location 'build/schemas/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             build/rendered

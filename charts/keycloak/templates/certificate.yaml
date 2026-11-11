@@ -2,7 +2,7 @@
 #   keycloak.conservices-identity.svc...         in-cluster admin API (HR, Learn, Den)
 #   keycloak-public.conservices-identity.svc...  the Gateway (BackendTLSPolicy) and
 #                                                pods resolving auth.<domain> via CoreDNS
-#   auth.<domain>, auth-admin.<domain>           public names (CoreDNS rewrite, Gateway)
+#   <host>.<domain>, <adminHost>.<domain>        public names (CoreDNS rewrite, Gateway)
 # Keycloak re-reads the files every hour, so renewals need no restart.
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -35,5 +35,5 @@ spec:
     - keycloak-public.conservices-identity
     - keycloak-public.conservices-identity.svc
     - keycloak-public.conservices-identity.svc.cluster.local
-    - auth.{{ .Values.domain }}
-    - auth-admin.{{ .Values.domain }}
+    - {{ .Values.host }}.{{ .Values.domain }}
+    - {{ .Values.adminHost }}.{{ .Values.domain }}

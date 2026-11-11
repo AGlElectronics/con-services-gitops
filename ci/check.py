@@ -9,6 +9,9 @@
   - every module Application sets den.mode "required" and its backend
     ConfigMap carries DEN_MODE=required; Den's preregisterModules (and its
     DEN_PREREGISTER_MODULES) list exactly the enabled modules;
+  - every OpenBao path an ExternalSecret or PushSecret uses is in the
+    layout (modules/... or infra/...) and in the seed plan, and every
+    seed plan entry is read by some ExternalSecret;
   - prints a sizing table (replicas x requests and limits, PVC sizes).
 
   python3 ci/check.py build/rendered [--sizing]
@@ -151,11 +154,50 @@ def check_den_pairing(out):
     return len(modules)
 
 
+def check_openbao_paths(out):
+    """OpenBao paths of ExternalSecrets and PushSecrets match the seed plan."""
+    plan_file = out / "seed-plan.json"
+    if not plan_file.exists():
+        errors.append("seed-plan.json missing (render with ci/render.py)")
+        return 0
+    plan = json.loads(plan_file.read_text(encoding="utf-8"))
+    generated = {g["path"] for g in plan["generated"]}
+    manual = {m["path"] for m in plan["manual"]}
+    known = generated | manual
+    read, used = set(), 0
+    for f in sorted(out.glob("*--*.yaml")):
+        app = f.name.split("--")[0]
+        for obj in yaml.safe_load_all(f.read_text(encoding="utf-8")):
+            if not obj or obj.get("kind") not in ("ExternalSecret", "PushSecret"):
+                continue
+            spec = obj.get("spec") or {}
+            where = f"{app}: {obj['kind']}/{obj['metadata'].get('name')}"
+            if obj["kind"] == "ExternalSecret":
+                keys = [(d.get("remoteRef") or {}).get("key") for d in spec.get("data") or []]
+                keys += [(d.get("extract") or {}).get("key") for d in spec.get("dataFrom") or []]
+            else:
+                keys = [((d.get("match") or {}).get("remoteRef") or {}).get("remoteKey") for d in spec.get("data") or []]
+            for key in keys:
+                used += 1
+                if not key or not key.startswith(("modules/", "infra/")):
+                    errors.append(f"{where}: OpenBao path {key!r} is not below modules/ or infra/")
+                elif key not in known:
+                    errors.append(f"{where}: OpenBao path {key!r} is not in the seed plan (charts/root root.seedPlan)")
+                elif obj["kind"] == "PushSecret" and key not in generated:
+                    errors.append(f"{where}: PushSecret writes {key!r}, which is not a generated entry")
+                if obj["kind"] == "ExternalSecret":
+                    read.add(key)
+    for path in sorted(known - read):
+        errors.append(f"seed plan: {path} is in the seed plan but no ExternalSecret reads it")
+    return used
+
+
 def main():
     out = pathlib.Path(sys.argv[1])
     sizing = "--sizing" in sys.argv
     pvcs = []
     module_count = check_den_pairing(out)
+    openbao_refs = check_openbao_paths(out)
     for f in sorted(out.glob("*--*.yaml")):
         app = f.name.split("--")[0]
         for obj in yaml.safe_load_all(f.read_text(encoding="utf-8")):
@@ -224,6 +266,7 @@ def main():
         sys.exit(1)
     print(f"check: {len(rows)} containers with requests and limits, all images pinned")
     print(f"check: {module_count} module(s), each with den.mode required and listed in Den's preregisterModules")
+    print(f"check: {openbao_refs} OpenBao references, all in the seed plan (modules/..., infra/...)")
 
 
 if __name__ == "__main__":

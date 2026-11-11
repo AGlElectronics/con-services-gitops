@@ -40,12 +40,12 @@ spec:
       standardFlowEnabled: true
       implicitFlowEnabled: false
       protocol: openid-connect
-      rootUrl: https://submit.{{.Values.domain}}
-      baseUrl: https://submit.{{.Values.domain}}
+      rootUrl: https://{{.Values.appHosts.submit}}.{{.Values.domain}}
+      baseUrl: https://{{.Values.appHosts.submit}}.{{.Values.domain}}
       redirectUris:
-      - https://submit.{{.Values.domain}}/*
+      - https://{{.Values.appHosts.submit}}.{{.Values.domain}}/*
       webOrigins:
-      - https://submit.{{.Values.domain}}
+      - https://{{.Values.appHosts.submit}}.{{.Values.domain}}
       attributes:
         pkce.code.challenge.method: S256
-        post.logout.redirect.uris: https://submit.{{.Values.domain}}/*
+        post.logout.redirect.uris: https://{{.Values.appHosts.submit}}.{{.Values.domain}}/*

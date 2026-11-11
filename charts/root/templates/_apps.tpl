@@ -16,9 +16,10 @@ route:
   timeout: 60s
 ingress:
   enabled: false
+{{- $ha := (include "root.profile" .root | fromJson).appHA }}
 ha:
-  podDisruptionBudget: true
-  topologySpread: true
+  podDisruptionBudget: {{ $ha }}
+  topologySpread: {{ $ha }}
 {{- if .root.Values.images.pullSecret.enabled }}
 imagePullSecrets:
   - name: ghcr-pull
@@ -63,14 +64,15 @@ S3_USE_PATH_STYLE: {{ .s3.pathStyle | quote }}
 {{- $v := .Values }}
 {{- $d := $v.domain }}
 {{- $s3 := include "root.s3" . | fromYaml }}
-{{- $tag := $v.den.imageTag | default $v.images.tag }}
+{{- $tag := $v.den.version }}
+{{- $denHost := include "root.fqdn" (dict "root" . "host" $v.den.host) }}
 {{- $meta := include "root.moduleMeta" . | fromYaml }}
 {{- $buckets := list (printf "%s-conservices-den" $s3.prefix) }}
 {{- $prereg := list }}
 {{- range $n := fromJsonArray (include "root.enabledModules" .) }}
 {{- $mm := index $meta $n }}
 {{- if $mm.s3 }}{{ $buckets = append $buckets (printf "%s-conservices-%s" $s3.prefix $n) }}{{ end }}
-{{- $prereg = append $prereg (dict "slug" $mm.slug "display_name" $mm.title "base_url" (printf "https://%s.%s" $mm.host $d)) }}
+{{- $prereg = append $prereg (dict "slug" $mm.slug "display_name" $mm.title "base_url" (printf "https://%s" (include "root.fqdn" (dict "root" $ "host" (index $v.modules $n).host)))) }}
 {{- end }}
 image:
   backend: { tag: {{ $tag | quote }} }
@@ -84,9 +86,9 @@ frontend:
     oidcAuthority: {{ include "root.issuer" . }}
     oidcClientId: den-spa
 config:
-  APP_BASE_URL: https://den.{{ $d }}
+  APP_BASE_URL: https://{{ $denHost }}
   OIDC_ISSUER_URL: {{ include "root.issuer" . }}
-  CORS_ALLOWED_ORIGINS: https://den.{{ $d }}
+  CORS_ALLOWED_ORIGINS: https://{{ $denHost }}
   KEYCLOAK_ADMIN_URL: https://keycloak.conservices-identity.svc.cluster.local:8443
   {{- include "root.appS3Config" (dict "s3" $s3 "bucket" (printf "%s-conservices-den" $s3.prefix)) | nindent 2 }}
 # The enabled modules, listed unpaired on Den's Modules page from the first
@@ -113,7 +115,7 @@ operatorConfig:
   FILES_S3_REGION: {{ $s3.region | quote }}
   FILES_S3_USE_PATH_STYLE: {{ $s3.pathStyle | quote }}
   FILES_S3_BUCKETS: {{ join "," $buckets | quote }}
-{{ include "root.appCommon" (dict "root" . "host" (printf "den.%s" $d) "s3" true "fqdns" $s3.backupFqdns) }}
+{{ include "root.appCommon" (dict "root" . "host" $denHost "s3" true "fqdns" $s3.backupFqdns) }}
 {{- end }}
 
 {{/* A module. Argument: dict root, name. */}}
@@ -126,8 +128,9 @@ operatorConfig:
 {{- $meta := index (include "root.moduleMeta" $root | fromYaml) $n }}
 {{- $enabled := fromJsonArray (include "root.enabledModules" $root) }}
 {{- $s3 := include "root.s3" $root | fromYaml }}
-{{- $tag := $m.imageTag | default $v.images.tag }}
-{{- $host := printf "%s.%s" $meta.host $d }}
+{{- $tag := $m.version }}
+{{- $host := include "root.fqdn" (dict "root" $root "host" $m.host) }}
+{{- $denHost := include "root.fqdn" (dict "root" $root "host" $v.den.host) }}
 image:
   backend: { tag: {{ $tag | quote }} }
   frontend: { tag: {{ $tag | quote }} }
@@ -153,19 +156,19 @@ config:
   APP_BASE_URL: https://{{ $host }}
   OIDC_ISSUER_URL: {{ include "root.issuer" $root }}
   {{- if eq $n "rally" }}
-  CORS_ALLOWED_ORIGINS: https://{{ $host }},https://submit.{{ $d }}
-  ATTENDEE_OIDC_ISSUER_URL: https://auth.{{ $d }}/realms/attendees
+  CORS_ALLOWED_ORIGINS: https://{{ $host }},https://{{ include "root.fqdn" (dict "root" $root "host" $m.submit.host) }}
+  ATTENDEE_OIDC_ISSUER_URL: {{ include "root.issuer" (dict "root" $root "realm" "attendees") }}
   PUBLIC_SCHEDULE_ENABLED: "false"
   PUBLIC_API_BUILTIN_KEY: ""
   {{- else if eq $n "learn" }}
-  CORS_ALLOWED_ORIGINS: https://{{ $host }},https://den.{{ $d }}
+  CORS_ALLOWED_ORIGINS: https://{{ $host }},https://{{ $denHost }}
   PUBLIC_BASE_URL: https://{{ $host }}
   SMTP_FROM: {{ $v.smtp.from | default (printf "no-reply@%s" $d) | quote }}
   {{- else }}
   CORS_ALLOWED_ORIGINS: https://{{ $host }}
   {{- end }}
   {{- if eq $n "hr" }}
-  KEYCLOAK_SETUP_REDIRECT_URI: https://den.{{ $d }}/
+  KEYCLOAK_SETUP_REDIRECT_URI: https://{{ $denHost }}/
   {{- $catalogs := list }}
   {{- if has "stash" $enabled }}{{ $catalogs = append $catalogs "stash=https://stash-backend.conservices-stash.svc.cluster.local:8080/api/role-catalog" }}{{ end }}
   {{- if has "rally" $enabled }}{{ $catalogs = append $catalogs "events=https://rally-backend.conservices-rally.svc.cluster.local:8080/api/role-catalog" }}{{ end }}
@@ -178,12 +181,12 @@ config:
 {{- if eq $n "rally" }}
 submit:
   enabled: {{ $m.submit.enabled }}
-  host: submit.{{ $d }}
+  host: {{ include "root.fqdn" (dict "root" $root "host" $m.submit.host) }}
   # Attendees sign in through their own realm. No publicScheduleKey: the
   # builtin key is off (PUBLIC_API_BUILTIN_KEY above).
   config:
     authMode: oidc
-    oidcAuthority: https://auth.{{ $d }}/realms/attendees
+    oidcAuthority: {{ include "root.issuer" (dict "root" $root "realm" "attendees") }}
     oidcClientId: rally-submit
     publicScheduleKey: ""
 {{- end }}

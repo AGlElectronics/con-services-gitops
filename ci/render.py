@@ -8,7 +8,9 @@
    - local Helm charts (charts/*) with helm.valuesObject;
    - Kustomize directories (components/*) with kustomize.patches;
    - the Den and module charts from the main repository (--main-repo).
-3. Writes one file per source into --out, plus root.yaml.
+3. Writes one file per source into --out, plus root.yaml and the root
+   chart's seed plan (seed-plan.json: the OpenBao entries this cluster.yaml
+   needs).
 
 Needs helm and kubectl on PATH, and PyYAML.
 
@@ -97,6 +99,12 @@ def main():
         cmd += ["-f", f]
     root = run(cmd)
     (out / "root.yaml").write_text(root, encoding="utf-8")
+    # The seed plan (what OpenBao must hold), for ci/check.py.
+    plan = run(cmd + ["--set", "global.seedPlan=true", "--show-only", "templates/seed-plan.yaml"])
+    plan_line = next((l for l in plan.splitlines() if l.startswith("{")), None)
+    if plan_line is None:
+        sys.exit("FAILED: no seed plan in charts/root/templates/seed-plan.yaml")
+    (out / "seed-plan.json").write_text(plan_line + "\n", encoding="utf-8")
     cluster = {}
     for f in args.values:
         cluster.update(yaml.safe_load(open(f, encoding="utf-8")) or {})
@@ -106,9 +114,9 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         for app in apps:
             name = app["metadata"]["name"]
-            if name == "root":
-                continue
             spec = app["spec"]
+            if any(s.get("path") == "charts/root" for s in spec.get("sources") or [spec.get("source", {})]):
+                continue  # the root Application (rootApplication.name): that is root.yaml itself
             ns = spec["destination"].get("namespace", "default")
             sources = spec.get("sources") or [spec["source"]]
             for i, src in enumerate(sources):

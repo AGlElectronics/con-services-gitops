@@ -6,9 +6,11 @@
 
 # --- Required ---------------------------------------------------------------
 
-# Your domain. Apps live on <app>.<domain>, Rally on events.<domain>,
-# Keycloak on auth.<domain> (admin console: auth-admin.<domain>, internal
-# Gateway).
+# Your domain. Every app lives on <host>.<domain>; the host labels are set
+# per app below (den.host, modules.<name>.host, keycloak.host, ...).
+# Defaults: den, stash, hr, events (Rally), submit (Rally's submission
+# site), finance, learn, wiki, desk, tasks, auth (Keycloak) and auth-admin
+# (Keycloak's admin console, internal Gateway).
 domain: change-me
 
 git:
@@ -25,7 +27,7 @@ acme:
   issuer: letsencrypt-staging
   dns01:
     # cloudflare: DNS-01 through the Cloudflare API, token from OpenBao
-    #             kv/infra/cloudflare (property api-token).
+    #             conservices/infra/cloudflare (property api-token).
     # custom:     your own cert-manager solvers in acme.dns01.solvers (a list
     #             in cert-manager's ClusterIssuer format; you add any secret
     #             they need yourself).
@@ -61,53 +63,82 @@ den:
   # age PUBLIC key(s) Den encrypts its backups to, comma-separated
   # (age-keygen prints "Public key: age1..."). Not secret.
   backupAgeRecipients: change-me
-  # Empty: images.tag.
-  imageTag: ""
+  # Den's release: image tag MAJOR.MINOR.PATCH-BUILD. Every module's MAJOR
+  # must equal Den's MAJOR.
+  version: "1.0.0-1"
+  # Git revision of charts.repoURL with Den's chart. Empty: the tag
+  # den/v<MAJOR.MINOR.PATCH> of version (den/v1.0.0).
+  chartRevision: ""
+  # Host label: Den on <host>.<domain>.
+  host: den
   # Extra values for the Den chart (deploy/charts/den), merged last.
   values: {}
+
+# --- Root Application -------------------------------------------------------
+
+rootApplication:
+  # Name of the Application bootstrap/install-root creates (the "app of
+  # apps" that renders every other Application of this chart).
+  name: conservices-stack
+
+# --- Sizing profile ---------------------------------------------------------
+
+# standard: highly available, needs 3 or more nodes (PostgreSQL 3
+#           instances, Keycloak 2, PodDisruptionBudgets, spread over nodes).
+# small:    for 1 or 2 nodes, NOT highly available: PostgreSQL 1 instance,
+#           Keycloak 1, no PodDisruptionBudgets, nothing that refuses to
+#           share a node. Keys you set yourself (postgres.instances,
+#           keycloak.instances, den/modules values.ha.*) still win.
+# Docs: https://aglelectronics.github.io/con-services/deploy/sizing/#small-profile
+profile: standard
 
 # --- Images and charts ------------------------------------------------------
 
 images:
-  # Default tag of every Con Services image (MAJOR.MINOR.PATCH-BUILD).
-  tag: "1.0.0-1"
   pullSecret:
     # true: every Con Services namespace gets the Secret ghcr-pull from
-    # OpenBao kv/infra/ghcr (username, token) and uses it to pull images.
+    # OpenBao conservices/infra/ghcr (username, token) and uses it to pull images.
     # Only needed for private images.
     enabled: false
 
-# Where the Den and module Helm charts come from.
+# Where the Den and module Helm charts come from. Each app's chart is read
+# at its own revision (den.chartRevision, modules.<name>.chartRevision).
 charts:
   repoURL: https://github.com/AGlElectronics/con-services.git
-  targetRevision: v1.1.0
 
 # --- Modules ----------------------------------------------------------------
 # Opt-in: no module is installed until you enable it in cluster.yaml. Den is
 # always installed. Every enabled module is listed on Den's Modules page as
 # unpaired and waits for Den (den.mode: required) until you pair it there.
-# enabled:      install the module.
-# imageTag:     empty = images.tag.
-# accessConfig: the module's access configuration (TOML). Empty = the file
-#               charts/module-extras/files/access-config/<module>.toml.
-# values:       extra values for the module chart, merged last (replicas,
-#               resources, config.* settings). den.mode cannot be changed.
+# enabled:       install the module.
+# version:       the module's release, image tag MAJOR.MINOR.PATCH-BUILD.
+#                Its MAJOR must equal Den's MAJOR (den.version).
+# chartRevision: Git revision of charts.repoURL with the module's chart.
+#                Empty: the tag <module>/v<MAJOR.MINOR.PATCH> of version.
+# host:          host label: the module on <host>.<domain>. One DNS label
+#                (no dots), unique across all apps.
+# accessConfig:  the module's access configuration (TOML). Empty = the file
+#                charts/module-extras/files/access-config/<module>.toml.
+# values:        extra values for the module chart, merged last (replicas,
+#                resources, config.* settings). den.mode cannot be changed.
 
 modules:
-  stash:   { enabled: false, imageTag: "", accessConfig: "", values: {} }
-  hr:      { enabled: false, imageTag: "", values: {} }
+  stash:   { enabled: false, version: "1.0.0-1", chartRevision: "", host: stash, accessConfig: "", values: {} }
+  hr:      { enabled: false, version: "1.0.0-1", chartRevision: "", host: hr, values: {} }
   rally:
     enabled: false
-    imageTag: ""
+    version: "1.0.0-1"
+    chartRevision: ""
+    host: events
     accessConfig: ""
-    # Public submission site on submit.<domain>. Needs an image.
-    submit: { enabled: false }
+    # Public submission site on <submit.host>.<domain>. Needs an image.
+    submit: { enabled: false, host: submit }
     values: {}
-  finance: { enabled: false, imageTag: "", values: {} }
-  learn:   { enabled: false, imageTag: "", accessConfig: "", values: {} }
-  wiki:    { enabled: false, imageTag: "", accessConfig: "", values: {} }
-  desk:    { enabled: false, imageTag: "", accessConfig: "", values: {} }
-  tasks:   { enabled: false, imageTag: "", accessConfig: "", values: {} }
+  finance: { enabled: false, version: "1.0.0-1", chartRevision: "", host: finance, values: {} }
+  learn:   { enabled: false, version: "1.0.0-1", chartRevision: "", host: learn, accessConfig: "", values: {} }
+  wiki:    { enabled: false, version: "1.0.0-1", chartRevision: "", host: wiki, accessConfig: "", values: {} }
+  desk:    { enabled: false, version: "1.0.0-1", chartRevision: "", host: desk, accessConfig: "", values: {} }
+  tasks:   { enabled: false, version: "1.0.0-1", chartRevision: "", host: tasks, accessConfig: "", values: {} }
 
 # Sender address of Learn's mail. Empty: no-reply@<domain>.
 smtp:
@@ -121,7 +152,10 @@ gateway:
   public:
     # Fixed LoadBalancer IP, requested from Cilium LB IPAM with the
     # annotation lbipam.cilium.io/ips. Empty: any. The IP pool itself is
-    # the cluster's.
+    # the cluster's. Recommended: pin both. Unpinned, Cilium may hand the
+    # public and internal Gateways each other's address (for example after
+    # they are recreated), and your port forward then points at the
+    # internal Gateway.
     loadBalancerIP: ""
     # Extra annotations for the Gateway's Service (other load balancers).
     annotations: {}
@@ -164,8 +198,11 @@ openbao:
   # OpenBao's API as seen from External Secrets Operator. Use an address that
   # reaches only the unsealed leader (upstream chart: Service openbao-active).
   server: https://openbao-active.openbao.svc:8200
-  # Mount path of the KV version 2 engine Con Services uses.
-  kvPath: kv
+  # Mount path of the KV version 2 engine Con Services uses: its own mount
+  # at the root of OpenBao, next to any other mounts. Inside it, "modules/"
+  # holds Den's and the modules' entries and "infra/" the shared ones
+  # (PostgreSQL, Keycloak, Cloudflare, ghcr).
+  kvPath: conservices
   # The CA certificate that signed OpenBao's TLS certificate. Namespace
   # empty: externalSecrets.namespace. Name empty: no CA (OpenBao has a
   # publicly trusted certificate).
@@ -197,7 +234,8 @@ openbao:
 # --- Platform components ----------------------------------------------------
 
 postgres:
-  instances: 3
+  # Empty: 3 with profile standard, 1 with profile small.
+  instances: null
   resources: { requests: { cpu: 250m, memory: 1Gi }, limits: { cpu: "2", memory: 1Gi } }
   # Namespace of the CloudNativePG operator (a prerequisite).
   operatorNamespace: cnpg-system
@@ -216,9 +254,14 @@ keycloakOperator:
   resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
 
 keycloak:
-  instances: 2
+  # Host labels: sign-in on <host>.<domain>, admin console on
+  # <adminHost>.<domain> (internal Gateway only).
+  host: auth
+  adminHost: auth-admin
+  # Empty: 2 with profile standard, 1 with profile small.
+  instances: null
   resources: { requests: { cpu: 250m, memory: 1Gi }, limits: { cpu: "2", memory: 2Gi } }
   smtp:
     # true: the realms send mail (password reset, verification) through the
-    # server in OpenBao kv/conservices/keycloak/smtp.
+    # server in OpenBao conservices/infra/keycloak/smtp.
     enabled: true

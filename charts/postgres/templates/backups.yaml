@@ -3,7 +3,7 @@
 # second of the retention window.
 # Target: <bucketPrefix>-pg-backups at the backup S3 endpoint, ideally in
 # another region or at another provider, with its own key
-# (kv/conservices/postgres/backup-s3).
+# (conservices/infra/postgres/backup-s3).
 # Docs: https://aglelectronics.github.io/con-services/deploy/data/#backups
 apiVersion: barmancloud.cnpg.io/v1
 kind: ObjectStore

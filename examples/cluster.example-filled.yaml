@@ -26,6 +26,7 @@ s3:
 
 den:
   backupAgeRecipients: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
+  version: "1.0.0-1"
 
 gateway:
   public:
@@ -48,13 +49,18 @@ images:
 modules:
   stash:
     enabled: true
+    version: "1.0.0-1"
   hr:
     enabled: true
+    version: "1.0.0-1"
   rally:
     enabled: true
+    version: "1.0.0-1"
     submit:
       enabled: false
   wiki:
     enabled: true
+    version: "1.0.0-1"
   tasks:
     enabled: true
+    version: "1.0.0-1"

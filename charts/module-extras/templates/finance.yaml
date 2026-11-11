@@ -1,6 +1,6 @@
 {{- if eq .Values.app "finance" }}
 # Secrets of Finance in conservices-finance, built by External Secrets from OpenBao
-# (ClusterSecretStore "openbao", KV v2 at "kv"). Nothing secret is in Git.
+# (ClusterSecretStore "openbao", KV v2 at "conservices", openbao.kvPath). Nothing secret is in Git.
 # Its values are random and created by External Secrets (charts/secret-store).
 # Inventory: https://aglelectronics.github.io/con-services/operations/secrets/
 #
@@ -29,6 +29,6 @@ spec:
   data:
     - secretKey: dbPassword
       remoteRef:
-        key: conservices/postgres/roles/finance
+        key: infra/postgres/roles/finance
         property: password
 {{- end }}

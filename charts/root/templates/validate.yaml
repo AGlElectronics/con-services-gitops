@@ -3,6 +3,7 @@ Stops rendering with a readable message while cluster.yaml is incomplete.
 Renders nothing.
 */ -}}
 {{- $v := .Values }}
+
 {{- $required := dict
   "domain" $v.domain
   "git.repoURL" $v.git.repoURL
@@ -44,4 +45,37 @@ Renders nothing.
 {{- if ne (toString $mode) "required" }}
 {{- fail (printf "\n\ncluster.yaml: modules.%s.values.den.mode cannot be changed. Every module in this template waits for Den until you pair it from Den's Modules page.\n" $n) }}
 {{- end }}
+{{- end }}
+
+{{- /* Versions: MAJOR.MINOR.PATCH-BUILD, and every enabled module on Den's MAJOR. */ -}}
+{{- $versionRe := "^[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]+$" }}
+{{- if not (regexMatch $versionRe (toString $v.den.version)) }}
+{{- fail (printf "\n\ncluster.yaml: den.version must be MAJOR.MINOR.PATCH-BUILD, for example 1.0.0-1 (got %q; there is no latest).\n" (toString $v.den.version)) }}
+{{- end }}
+{{- $denMajor := index (splitList "." $v.den.version) 0 }}
+{{- range $n := fromJsonArray (include "root.enabledModules" .) }}
+{{- $ver := toString (index $v.modules $n).version }}
+{{- if not (regexMatch $versionRe $ver) }}
+{{- fail (printf "\n\ncluster.yaml: modules.%s.version must be MAJOR.MINOR.PATCH-BUILD, for example 1.0.0-1 (got %q; there is no latest).\n" $n $ver) }}
+{{- end }}
+{{- if ne (index (splitList "." $ver) 0) $denMajor }}
+{{- fail (printf "\n\ncluster.yaml: %s %s needs Den %s.x, but den.version is %s. A module's MAJOR must equal Den's MAJOR: change modules.%s.version or den.version.\n" $n (include "root.semver" $ver) (index (splitList "." $ver) 0) (include "root.semver" $v.den.version) $n) }}
+{{- end }}
+{{- end }}
+
+{{- /* Host labels: one DNS label each (the wildcard certificate covers one level), unique. */ -}}
+{{- $seen := dict }}
+{{- range $h := fromJsonArray (include "root.hostsInUse" .) }}
+{{- if not (regexMatch "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$" (toString $h.host)) }}
+{{- fail (printf "\n\ncluster.yaml: %s must be one lowercase DNS label without dots, for example \"portal\" for portal.%s (got %q). The wildcard certificate *.%s covers exactly one level.\n" $h.key $v.domain (toString $h.host) $v.domain) }}
+{{- end }}
+{{- if hasKey $seen $h.host }}
+{{- fail (printf "\n\ncluster.yaml: %s and %s both use the host %s.%s. Every app needs its own host label.\n" (get $seen $h.host) $h.key $h.host $v.domain) }}
+{{- end }}
+{{- $_ := set $seen $h.host $h.key }}
+{{- end }}
+
+{{- /* The root Application's name must not clash with an Application it renders. */ -}}
+{{- if has $v.rootApplication.name (splitList " " (include "root.childNames" .)) }}
+{{- fail (printf "\n\ncluster.yaml: rootApplication.name %q is the name of one of the Applications the root chart renders. Pick another name (default: conservices-stack).\n" $v.rootApplication.name) }}
 {{- end }}

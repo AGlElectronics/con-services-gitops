@@ -1,0 +1,6 @@
+# Laid over examples/cluster.example-filled.yaml by CI: must FAIL, a
+# module's MAJOR differs from Den's.
+# expect: hr 2.3.0 needs Den 2.x, but den.version is 1.0.0
+modules:
+  hr:
+    version: "2.3.0-1"

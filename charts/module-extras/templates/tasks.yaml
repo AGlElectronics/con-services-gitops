@@ -1,6 +1,6 @@
 {{- if eq .Values.app "tasks" }}
 # Secrets of Tasks in conservices-tasks, built by External Secrets from OpenBao
-# (ClusterSecretStore "openbao", KV v2 at "kv"). Nothing secret is in Git.
+# (ClusterSecretStore "openbao", KV v2 at "conservices", openbao.kvPath). Nothing secret is in Git.
 # Random values are created by External Secrets (charts/secret-store); S3
 # keys are entered by you (bootstrap/scripts/openbao-seed.sh).
 # Inventory: https://aglelectronics.github.io/con-services/operations/secrets/
@@ -33,18 +33,18 @@ spec:
   data:
     - secretKey: dbPassword
       remoteRef:
-        key: conservices/postgres/roles/tasks
+        key: infra/postgres/roles/tasks
         property: password
     - secretKey: s3AccessKey
       remoteRef:
-        key: conservices/tasks/s3
+        key: modules/tasks/s3
         property: access_key
     - secretKey: s3SecretKey
       remoteRef:
-        key: conservices/tasks/s3
+        key: modules/tasks/s3
         property: secret_key
     - secretKey: tasksToken
       remoteRef:
-        key: conservices/service-tokens/tasks
+        key: modules/tasks/service-token
         property: token
 {{- end }}

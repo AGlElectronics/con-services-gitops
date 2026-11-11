@@ -12,12 +12,15 @@ main repository and writes KeycloakRealmImport templates:
   - same realm settings, roles, groups, clients and protocol mappers;
   - NO users, except the service-account users that carry the
     realm-management roles of the confidential clients;
-  - redirect URIs and web origins on https://<app>.<domain> only (no
-    localhost); the domain is the Helm value .Values.domain;
+  - redirect URIs and web origins on https://<host>.<domain> only (no
+    localhost); the domain is the Helm value .Values.domain and each app's
+    host label the value .Values.appHosts.<label>, where <label> is the
+    app's sub-domain in the development realm (den, stash, events, submit,
+    ...); cluster.yaml sets them (den.host, modules.<name>.host, ...);
   - direct access grants (password grant) off for the public *-spa clients;
   - client secrets and the SMTP login as ${PLACEHOLDERS}, filled by the
     Keycloak Operator from the Secret keycloak-realm-secrets (OpenBao
-    kv/conservices/keycloak/clients and kv/conservices/keycloak/smtp);
+    conservices/infra/keycloak/clients and conservices/infra/keycloak/smtp);
     the SMTP block only with .Values.smtp.enabled;
   - sslRequired "all";
   - self-registration off in the staff realm "conservices".
@@ -42,6 +45,10 @@ import yaml
 
 DEV_DOMAIN = "conservices.test"
 DOMAIN_TOKEN = "{{.Values.domain}}"
+# <label>.conservices.test -> {{.Values.appHosts.<label>}}.{{.Values.domain}}
+DEV_HOST = re.compile(r"\b([a-z][a-z0-9-]*)\." + re.escape(DEV_DOMAIN) + r"\b")
+# Labels the chart's values.yaml (appHosts) and the root chart provide.
+APP_HOSTS = {"den", "stash", "hr", "events", "finance", "learn", "wiki", "desk", "tasks", "submit"}
 OUT = pathlib.Path("charts/keycloak/templates")
 
 # client ID -> placeholder name; the Secret key is the client ID.
@@ -114,7 +121,15 @@ def transform(realm):
     if realm.get("realm") in STAFF_REALMS:
         realm["registrationAllowed"] = False
     realm.pop("smtpServer", None)
-    return json.loads(json.dumps(realm).replace(DEV_DOMAIN, DOMAIN_TOKEN)), used
+    return json.loads(DEV_HOST.sub(host_token, json.dumps(realm)).replace(DEV_DOMAIN, DOMAIN_TOKEN)), used
+
+
+def host_token(match):
+    label = match.group(1)
+    if label not in APP_HOSTS:
+        sys.exit(f"host {match.group(0)!r} has no setting; add {label!r} to APP_HOSTS, to appHosts in "
+                 "charts/keycloak/values.yaml and to the root chart's keycloak values")
+    return "{{.Values.appHosts." + label + "}}." + DOMAIN_TOKEN
 
 
 def main():

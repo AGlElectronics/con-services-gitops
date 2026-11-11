@@ -6,223 +6,147 @@ and the repository uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-First version of the template.
+First release of the template (1.0.0).
 
 ### Added
 
-- OpenBao is set up by Argo CD after a review. The new Application
-  `openbao-setup` (wave -5) is the only one without automatic sync: Argo CD
-  waits there until you have looked at its diff and pressed **Sync**. Its
-  Job then enables the KV engine and writes the role External Secrets logs
-  in with. It logs in through the narrow role `conservices-setup` that the
-  OpenBao administrator creates once with `openbao-configure.sh`. That role
-  cannot read secrets or grant itself more rights. On by default
-  (`openbao.setup.enabled`); set it to `false` to keep OpenBao's
-  configuration entirely in the administrator's hands. New `cluster.yaml`
-  keys: `openbao.namespace` and `openbao.setup.*`.
-- External Secrets creates every random secret (database passwords, Den
-  operator token, service tokens, Desk key, Keycloak client secrets and
-  bootstrap admin password) through PushSecrets. It never replaces an
-  existing value. You only enter your provider credentials.
-
-### Changed
-
-- **BREAKING:** External Secrets' OpenBao policy is now
-  `conservices-external-secrets` and may also create entries under `kv/`
-  (for the random secrets); `conservices-external-secrets-read` is no longer
-  used. Run `bootstrap/scripts/openbao-configure.sh` again, sync
-  `openbao-setup`, then delete the old policy with
-  `bao policy delete conservices-external-secrets-read`.
-- **BREAKING:** `openbao-seed.sh` no longer generates values and lost
-  `--rotate`; it only asks for your provider credentials (S3, SMTP,
-  Cloudflare, registry). To rotate a generated value, delete it in OpenBao
-  and External Secrets creates a new one
-  ([how](https://aglelectronics.github.io/con-services/deploy/secrets-openbao/#rotate-a-generated-value)).
-  Entries the old script wrote stay as they are. `openssl` is no longer
-  needed.
-- Keycloak's temporary admin is always named `temp-admin`; only its password
-  is read from `kv/conservices/keycloak/bootstrap-admin`.
-
-- **BREAKING:** cert-manager, trust-manager, External Secrets Operator,
-  OpenBao, the CloudNativePG operator and its Barman Cloud plugin are now
-  cluster prerequisites that the cluster operator installs; the template
-  only uses them. Removed: their Applications, `values/*.yaml` files and
-  `charts/openbao-extras`; the `cluster.yaml` keys `certManager`,
-  `trustManager`, `cnpg`, `acme.recursiveNameservers`,
-  `adminRoutes.openbao` and the old `externalSecrets` and `openbao` blocks;
-  the `bao.<domain>` route; the namespace `cnpg-system` from
-  `platform-namespaces`; `bootstrap/scripts/openbao-init.sh` and
-  `openbao-unseal.sh`. `cnpg.barmanCloud.sidecarResources` moved to
-  `postgres.backup.sidecarResources`.
-  What to do on an existing installation, **before** pulling this change:
-  1. Stop Argo CD from deleting the operator namespace:
-     `kubectl annotate namespace cnpg-system argocd.argoproj.io/sync-options=Prune=false`.
-  2. Remove the moved keys from your `cluster.yaml` (the schema rejects them).
-  3. Keep the components running under your own management. The old
-     Applications have no deletion finalizer, so the workloads stay when
-     the template drops them; adopt them with Applications or Helm
-     releases of the same names (see the
-     [prerequisites](https://aglelectronics.github.io/con-services/deploy/prerequisites/)).
-  4. Keep the existing OpenBao CA: set `openbao.caBundle.name:
-     conservices-internal-ca` and keep the label
-     `app.kubernetes.io/part-of=conservices` on the namespace
-     `external-secrets`.
-  5. Unseal with your own copy of `openbao-unseal.sh` (or the OpenBao CLI)
-     from now on.
-- **BREAKING:** the template no longer manages Argo CD, LoadBalancer IPs,
-  cluster DNS or the Actions Runner Controller; like the components above,
-  they belong to the cluster. Removed: the `argocd`, `cilium-lb`,
-  `oidc-hairpin` and `arc-controller` Applications, `charts/cilium-lb`,
-  `charts/oidc-hairpin`, `values/arc-controller.yaml`, and the
-  `cluster.yaml` keys `argocd`, `loadBalancer`, `oidcHairpin` and
-  `arc.resources.controller`. The internal Gateway no longer accepts routes
-  from the `argocd` namespace. `gateway.*.loadBalancerIP` still requests a
-  fixed address from the cluster's Cilium LB IPAM pool.
-  What to do on an existing installation, **before** pulling this change:
-  1. Remove those keys from your `cluster.yaml` (the schema rejects them).
-  2. Keep the objects running under your own management. None of the four
-     Applications has a deletion finalizer, so Argo CD, the IP pool, the
-     CoreDNS ConfigMap and the ARC controller stay when the template drops
-     them. Keep managing Argo CD with `helm upgrade` and
-     `bootstrap/argocd/values.yaml`; export the IP pool and the CoreDNS
-     ConfigMap (`kubectl get ... -o yaml`) if you want them in your own
-     cluster repository.
-  3. To keep Argo CD's UI on `argocd.<domain>`, give it your own route
-     (for example the Argo CD chart's `server.httproute` on a Gateway of
-     your cluster).
-- **BREAKING:** the template no longer contains self-hosted GitHub Actions
-  runners or an example cluster; neither is part of Con Services. Removed:
-  the `arc-runners` Application, `charts/arc-runners-extras`,
-  `values/arc-runners.yaml`, the `cluster.yaml` block `arc`, the OpenBao
-  entry `kv/infra/github-arc` from `openbao-seed.sh`, and
-  `bootstrap/example-k3s/`.
-  What to do on an existing installation, **before** pulling this change:
-  1. Remove the `arc` block from your `cluster.yaml` (the schema rejects it).
-  2. With `arc.enabled`, the root Application deletes `arc-runners` and its
-     namespace's runner scale set on the next sync. To keep the runners,
-     first move them to your own Application or Helm release
-     (`gha-runner-scale-set` 0.15.1), then delete
-     `kv/infra/github-arc` from OpenBao once nothing reads it.
-- **BREAKING:** modules are now opt-in. Every `modules.<name>.enabled`
-  defaults to `false`, and only Den is deployed until you enable modules.
-  What to do: in `cluster.yaml`, under *Pick the modules to run*, set
-  `enabled: true` for every module you want to keep. A module you leave at
-  `false` has its Application deleted on the next sync; its database and
-  bucket are kept.
-- `cluster.yaml` lists all eight modules in a visible block (*Pick the
-  modules to run*) instead of a commented-out example. Zero enabled modules
-  is a valid installation.
-- `charts.targetRevision` defaults to `v1.1.0`: the Den and module charts
-  of that release are needed for the two settings below.
-- The README and `bootstrap/` no longer show how to install Argo CD. Step 3
-  of the README checks that Argo CD runs with the Application health check;
-  `bootstrap/argocd/values.yaml` is reference values (the required health
-  check, plus optional HA settings), and `install-root.sh` points to the
-  Argo CD requirements when Argo CD is missing.
-
-### Added
-
-- `cluster.yaml` settings for the cluster's OpenBao and External Secrets
-  Operator: `openbao.server`, `openbao.kvPath`, `openbao.caBundle`
-  (default: ConfigMap `openbao-ca`, key `ca.crt`, in the External Secrets
-  namespace), `openbao.auth.mountPath`, `openbao.auth.role`,
-  `externalSecrets.namespace` and `externalSecrets.serviceAccount`, and
-  `postgres.operatorNamespace` (default `cnpg-system`). The
-  `ClusterSecretStore` `openbao` is now the local chart `charts/secret-store`.
-- `bootstrap/scripts/openbao-configure.sh`: prepares an existing OpenBao
-  for Con Services (KV v2 engine, Kubernetes auth, policy
-  `conservices-external-secrets-read`, role for External Secrets Operator)
-  from the `cluster.yaml` settings above. `openbao-seed.sh` and
-  `openbao-configure.sh` ask for the token when neither `BAO_TOKEN` nor
-  `INIT_FILE` is set.
-- `bootstrap/install-root.sh` checks the prerequisites before it applies
-  the root Application: the cert-manager, trust-manager, External Secrets,
-  CloudNativePG and Barman Cloud CRDs, the External Secrets service account
-  and the OpenBao CA. `--skip-preflight` skips the check.
-- CI validates against the CRDs of the tested prerequisite versions
-  (cert-manager v1.21.3, trust-manager v0.26.0, External Secrets 2.14.0,
-  CloudNativePG chart 0.29.1, Barman Cloud plugin chart 0.8.1).
-- Every module Application sets `den.mode: required`: until a module is
-  paired with Den, it shows *Waiting for Den* and its API answers
-  `503 den_pairing_required`. There is no standalone option; the root chart
-  stops when `modules.<name>.values.den.mode` tries to change it.
-- Den's Application sets `preregisterModules` from the enabled modules
-  (slug, display name and `https://<host>.<domain>`; Rally is `events`), so
-  Den lists them as unpaired on its Modules page and an admin only clicks
-  **Pair**.
-- CI: `ci/check.py` asserts that every module Application has
-  `den.mode: required` (and `DEN_MODE=required` in its rendered ConfigMap)
-  and that Den's `preregisterModules` lists exactly the enabled modules. The
-  workflow also renders and checks an installation with Den only
-  (`ci/no-modules.yaml`); `ci/render.py` accepts several `--values` files.
-- `examples/cluster.example-filled.yaml` enables Stash, HR, Rally, Wiki and
-  Tasks.
+**Installation with Argo CD**
 
 - One settings file, `cluster.yaml`: domain, Git repository, Let's Encrypt,
   S3 service, modules, network and sizing. It is the only file an operator
   edits. Rendering stops with a list of every value that is still
   `change-me`, and `values.schema.json` rejects unknown or misspelt keys.
-- Root Helm chart `charts/root` that renders every Argo CD Application from
-  `cluster.yaml`, ordered by sync waves, plus the root Application itself.
-  `bootstrap/install-root.sh` creates the root Application once.
-- Recommended Argo CD 3.6.1 values (chart `argo-cd` 10.14.0, HA mode with
-  Redis HA and the Application health check the sync waves need) in
-  `bootstrap/argocd/values.yaml`.
-- The Con Services internal CA (`ClusterIssuer/conservices-internal-ca`,
-  `Bundle/conservices-internal-ca`) on the cluster's cert-manager and
-  trust-manager.
-- Let's Encrypt ClusterIssuers `letsencrypt-staging` and `letsencrypt-prod`
-  with DNS-01 (Cloudflare, or your own cert-manager solvers in
-  `acme.dns01.solvers`), and a wildcard certificate for the domain.
+- App of apps: the root chart `charts/root` renders every Argo CD
+  Application from `cluster.yaml`, plus the root Application itself,
+  named `conservices-stack` (setting `rootApplication.name`).
+- Sync waves: cluster-wide objects first (waves -8 to -2), then
+  namespaces, Keycloak and PostgreSQL (waves 0 to 4), and Den and every
+  module together in the last wave (5), so a failing app never blocks Den,
+  the other modules or a fix you push for it. Retries use the latest
+  commit.
+- `bootstrap/install-root.sh` and `install-root.ps1` (Windows PowerShell
+  5.1 and PowerShell 7) create the root Application once. They check the
+  cluster prerequisites first (cert-manager, trust-manager, External
+  Secrets Operator, CloudNativePG with the Barman Cloud plugin, the OpenBao
+  CA), warn loudly when Argo CD's Application health check is missing,
+  and print the next steps. `--dry-run` / `-DryRun` prints the
+  Application; `--skip-preflight` / `-SkipPreflight` skips the checks.
+- Reference Argo CD values in `bootstrap/argocd/values.yaml`: the
+  Application health check the sync waves need, plus optional HA settings.
+  Argo CD itself, cert-manager, trust-manager, External Secrets Operator,
+  OpenBao and CloudNativePG are cluster prerequisites the template uses but
+  does not install.
+
+**Den and the modules**
+
+- Argo CD Applications for Den and every enabled module: the chart from
+  `AGlElectronics/con-services`, values computed from `cluster.yaml`, and
+  `charts/module-extras` with the ExternalSecrets for database URLs, S3
+  keys, client secrets and service tokens.
+- Modules are opt-in: `cluster.yaml` lists all eight under *Pick the
+  modules to run*, each with `enabled: false`. With none enabled, only Den
+  runs.
+- Every module waits for Den (`den.mode: required`, not configurable) until
+  it is paired; Den lists the enabled modules as unpaired on its Modules
+  page (`preregisterModules`). Nothing pairs automatically: an admin creates
+  the pairing URL in Den (**Modules → Pair**) and pastes it into the module's
+  *Den connection* page.
+- Each web app's sign-in settings (issuer and client) are set from
+  `cluster.yaml`, including Rally's public submission site.
+- Per-app versions: `den.version` and `modules.<name>.version`
+  (`MAJOR.MINOR.PATCH-BUILD`, default `1.0.0-1`, never `latest`) pin both
+  the images and the chart tag `<app>/v<MAJOR.MINOR.PATCH>`;
+  `chartRevision` overrides the chart's Git revision. Den leads: rendering
+  stops when an enabled module's MAJOR differs from Den's.
+- Configurable host names: `den.host`, `modules.<name>.host`,
+  `modules.rally.submit.host`, `keycloak.host` and `keycloak.adminHost`.
+  Each must be a single, unique DNS label, so the wildcard certificate
+  covers it.
+
+**Secrets with OpenBao and External Secrets**
+
+- Con Services keeps its secrets in its own OpenBao KV version 2 mount,
+  `conservices/` (`openbao.kvPath`), with `modules/` for Den and the
+  modules and `infra/` for PostgreSQL, Keycloak, Cloudflare and the
+  registry login.
+- The `openbao-setup` Application (wave -5) is the only one without
+  automatic sync: Argo CD waits until you have reviewed its diff and
+  pressed **Sync**. Its Job enables the KV engine and writes External
+  Secrets' role. Set `openbao.setup.enabled: false` to leave OpenBao's
+  configuration entirely to its administrator.
+- `bootstrap/scripts/openbao-configure.sh` and `.ps1`: the OpenBao
+  administrator's one-time step (Kubernetes auth, External Secrets' policy,
+  the setup Job's policy and role).
+- `bootstrap/scripts/openbao-seed.sh` and `.ps1`: optional helper that asks
+  only for the provider credentials the enabled modules and options need
+  (S3, SMTP, Cloudflare, registry). It checks every value before storing
+  it and checks values already stored, lists missing entries with the
+  Applications that wait for them (`--no-prompt`), replaces wrong ones
+  (`--overwrite`, `--reenter`), and warns when two S3 entries share an
+  access key.
+- External Secrets generates every random secret (database passwords, Den
+  operator token, service tokens, Desk key, Keycloak client secrets and
+  bootstrap admin password) through PushSecrets and never replaces an
+  existing value. The `ClusterSecretStore` `openbao` connects it to the
+  cluster's OpenBao (`openbao.*`, `externalSecrets.*`).
+
+**Platform**
+
+- Keycloak Operator and Keycloak 26.8.2 (`charts/keycloak`) with 2
+  instances, the database over `verify-full` TLS, HTTPS only, the public
+  sign-in route limited to `/realms/` and `/resources/`, the admin console
+  on the internal Gateway, the Con Services login theme, and production
+  realm imports (`conservices` and the attendee realm) without test users,
+  localhost URIs or development secrets.
+- PostgreSQL 16.15 cluster `conservices-pg` (`charts/postgres`) on the
+  cluster's CloudNativePG: 3 instances on different nodes, quorum
+  synchronous replication, TLS-only access with one login per database,
+  databases for exactly the enabled modules, continuous WAL archiving and
+  daily base backups (30 days) to S3 through the Barman Cloud plugin.
 - Gateways `public` (internet-facing, HTTP to HTTPS redirect) and
-  `internal` (admin UIs: Keycloak admin console, and optionally Longhorn
-  and Hubble) in the namespace `conservices-gateway`.
-- Optional `longhorn-single` StorageClass (`storage.longhornSingle`).
-- The `ClusterSecretStore` `openbao` through which External Secrets
-  Operator reads the cluster's OpenBao.
-- `bootstrap/scripts/openbao-seed.sh` fills OpenBao: it reads
-  `cluster.yaml`, creates only the entries the enabled modules and options
-  need, generates the random values, asks for the provider credentials,
-  never prints a value, and rotates only safe entries with `--rotate`.
-- Platform namespaces `conservices-data` and `conservices-identity` with
-  default-deny NetworkPolicies and Pod Security labels.
-- PostgreSQL 16.15 cluster `conservices-pg` (`charts/postgres`): 3
-  instances on different nodes, quorum synchronous replication, TLS-only
-  `pg_hba` with one login per database, roles and databases for exactly
-  the enabled modules, passwords from OpenBao, continuous WAL archiving and
-  daily base backups (30 days) to a managed S3 service, egress to S3 by
-  host name (Cilium `toFQDNs`).
-- Keycloak Operator 26.8.2 and Keycloak 26.8.2 with 2 instances
-  (`charts/keycloak`): database over `verify-full` TLS, HTTPS only, public
-  sign-in route limited to `/realms/` and `/resources/`, admin console on
-  the internal Gateway, the Con Services login theme, NetworkPolicies, and
-  production realm imports without test users, localhost URIs or dev
-  secrets (generated by `bootstrap/scripts/keycloak-realm.py`).
-- Argo CD Applications for Den (sync wave 5) and every enabled module
-  (wave 10): the chart from the main repository at a pinned tag, values
-  computed from `cluster.yaml`, and `charts/module-extras` with the
-  ExternalSecrets for `DATABASE_URL`, S3 keys, client secrets and service
-  tokens. The `ghcr-pull` image pull secret is optional
-  (`images.pullSecret.enabled`).
+  `internal` (admin UIs) in `conservices-gateway`. `cluster.yaml`
+  recommends pinning both Gateway IPs (`gateway.*.loadBalancerIP`), so the
+  router's port forward always reaches the public Gateway.
+- Let's Encrypt ClusterIssuers (staging and production) with DNS-01
+  (Cloudflare, or your own solvers) and a wildcard certificate for the
+  domain; the Con Services internal CA on the cluster's cert-manager and
+  trust-manager.
+- `profile: small` for clusters with 1 or 2 nodes: one PostgreSQL and one
+  Keycloak instance, no PodDisruptionBudgets and no rules that need
+  separate nodes. It is not highly available.
 - CPU and memory requests and limits on every container, set in
-  `cluster.yaml`; with the example's five modules the defaults total about
-  2.1 CPU and 6.4 GiB of requests, not counting the prerequisites (Argo CD
-  included).
+  `cluster.yaml`.
 - Applications that hold data (`platform-namespaces`, `postgres`) have no
-  deletion finalizer, and databases use `databaseReclaimPolicy: retain`, so
+  deletion finalizer and databases use `databaseReclaimPolicy: retain`, so
   deleting an Application or disabling a module never deletes data.
 - `examples/cluster.example-filled.yaml`, a complete example with
   `example.org`.
-- CI workflow `.github/workflows/validate.yml`: shell checks, `helm lint`,
-  a check that the blank `cluster.yaml` is rejected, a full render of
-  every Application, a check for requests, limits and pinned image tags,
-  strict validation against the Kubernetes 1.37 and CRD schemas, and a
-  check that no installation-specific data (real IP or e-mail addresses)
+
+**CI**
+
+- `.github/workflows/validate.yml`: shell checks, PowerShell parse check,
+  `helm lint`, a check that the blank `cluster.yaml` is rejected, a full
+  render of every Application, checks for requests, limits, pinned image
+  tags and modules waiting for Den, strict validation against the
+  Kubernetes and prerequisite CRD schemas, a check that every OpenBao path
+  is part of the seed plan, and a check that no installation-specific data
   is committed.
-- The root chart sets each web app's sign-in settings (`frontend.config`,
-  served as `/config.json`): issuer `https://auth.<domain>/realms/conservices`
-  and client `<module>-spa` (`events-spa` for Rally), and for Rally's
-  submission site `submit.config` with the attendee realm and client
-  `rally-submit`. The published frontend images are used unchanged; no new
-  `cluster.yaml` keys. Needs module charts 0.2.2 (Den 0.1.2) or newer; older
-  charts ignore the values.
+- Test renders for Den only, without the OpenBao setup Job, the small
+  profile and custom host names, and cases the root chart must reject (a
+  module MAJOR that differs from Den's, invalid or duplicate host names).
+
+### Security
+
+- Narrow OpenBao policies: the setup Job logs in through the role
+  `conservices-setup`, which can neither read secrets nor grant itself more
+  rights. External Secrets may read Con Services' entries but write only
+  `conservices/modules/`, `conservices/infra/postgres/` and
+  `conservices/infra/keycloak/`; the Cloudflare token and the registry
+  login are read-only for it.
+- Default-deny NetworkPolicies and Pod Security labels in every Con
+  Services namespace; PostgreSQL reaches S3 only by host name (Cilium
+  `toFQDNs`).
+- The bootstrap scripts pass tokens and secret values on standard input,
+  never on a command line, never print a value (hidden answers show only
+  their length and first and last four characters), and never store the
+  OpenBao administrator's token in the cluster.

@@ -1,6 +1,6 @@
 {{- if eq .Values.app "hr" }}
 # Secrets of HR in conservices-hr, built by External Secrets from OpenBao
-# (ClusterSecretStore "openbao", KV v2 at "kv"). Nothing secret is in Git.
+# (ClusterSecretStore "openbao", KV v2 at "conservices", openbao.kvPath). Nothing secret is in Git.
 # Its values are random and created by External Secrets (charts/secret-store).
 # Inventory: https://aglelectronics.github.io/con-services/operations/secrets/
 #
@@ -45,28 +45,28 @@ spec:
   data:
     - secretKey: dbPassword
       remoteRef:
-        key: conservices/postgres/roles/hr
+        key: infra/postgres/roles/hr
         property: password
     - secretKey: keycloakClientSecret
       remoteRef:
-        key: conservices/keycloak/clients
+        key: infra/keycloak/clients
         property: hr-provisioner
     {{- if has "learn" .Values.enabledModules }}
     - secretKey: learnToken
       remoteRef:
-        key: conservices/service-tokens/learn
+        key: modules/learn/service-token
         property: token
     {{- end }}
     {{- if has "wiki" .Values.enabledModules }}
     - secretKey: wikiToken
       remoteRef:
-        key: conservices/service-tokens/wiki
+        key: modules/wiki/service-token
         property: token
     {{- end }}
     {{- if has "tasks" .Values.enabledModules }}
     - secretKey: tasksToken
       remoteRef:
-        key: conservices/service-tokens/tasks
+        key: modules/tasks/service-token
         property: token
     {{- end }}
 {{- end }}

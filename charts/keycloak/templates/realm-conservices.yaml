@@ -118,15 +118,15 @@ spec:
       standardFlowEnabled: true
       implicitFlowEnabled: false
       protocol: openid-connect
-      rootUrl: https://stash.{{.Values.domain}}
-      baseUrl: https://stash.{{.Values.domain}}
+      rootUrl: https://{{.Values.appHosts.stash}}.{{.Values.domain}}
+      baseUrl: https://{{.Values.appHosts.stash}}.{{.Values.domain}}
       redirectUris:
-      - https://stash.{{.Values.domain}}/*
+      - https://{{.Values.appHosts.stash}}.{{.Values.domain}}/*
       webOrigins:
-      - https://stash.{{.Values.domain}}
+      - https://{{.Values.appHosts.stash}}.{{.Values.domain}}
       attributes:
         pkce.code.challenge.method: S256
-        post.logout.redirect.uris: https://stash.{{.Values.domain}}/*
+        post.logout.redirect.uris: https://{{.Values.appHosts.stash}}.{{.Values.domain}}/*
       protocolMappers:
       - name: groups
         protocol: openid-connect
@@ -146,15 +146,15 @@ spec:
       standardFlowEnabled: true
       implicitFlowEnabled: false
       protocol: openid-connect
-      rootUrl: https://den.{{.Values.domain}}
-      baseUrl: https://den.{{.Values.domain}}
+      rootUrl: https://{{.Values.appHosts.den}}.{{.Values.domain}}
+      baseUrl: https://{{.Values.appHosts.den}}.{{.Values.domain}}
       redirectUris:
-      - https://den.{{.Values.domain}}/*
+      - https://{{.Values.appHosts.den}}.{{.Values.domain}}/*
       webOrigins:
-      - https://den.{{.Values.domain}}
+      - https://{{.Values.appHosts.den}}.{{.Values.domain}}
       attributes:
         pkce.code.challenge.method: S256
-        post.logout.redirect.uris: https://den.{{.Values.domain}}/*
+        post.logout.redirect.uris: https://{{.Values.appHosts.den}}.{{.Values.domain}}/*
       protocolMappers:
       - name: groups
         protocol: openid-connect
@@ -174,15 +174,15 @@ spec:
       standardFlowEnabled: true
       implicitFlowEnabled: false
       protocol: openid-connect
-      rootUrl: https://events.{{.Values.domain}}
-      baseUrl: https://events.{{.Values.domain}}
+      rootUrl: https://{{.Values.appHosts.events}}.{{.Values.domain}}
+      baseUrl: https://{{.Values.appHosts.events}}.{{.Values.domain}}
       redirectUris:
-      - https://events.{{.Values.domain}}/*
+      - https://{{.Values.appHosts.events}}.{{.Values.domain}}/*
       webOrigins:
-      - https://events.{{.Values.domain}}
+      - https://{{.Values.appHosts.events}}.{{.Values.domain}}
       attributes:
         pkce.code.challenge.method: S256
-        post.logout.redirect.uris: https://events.{{.Values.domain}}/*
+        post.logout.redirect.uris: https://{{.Values.appHosts.events}}.{{.Values.domain}}/*
       protocolMappers:
       - name: groups
         protocol: openid-connect
@@ -202,15 +202,15 @@ spec:
       standardFlowEnabled: true
       implicitFlowEnabled: false
       protocol: openid-connect
-      rootUrl: https://finance.{{.Values.domain}}
-      baseUrl: https://finance.{{.Values.domain}}
+      rootUrl: https://{{.Values.appHosts.finance}}.{{.Values.domain}}
+      baseUrl: https://{{.Values.appHosts.finance}}.{{.Values.domain}}
       redirectUris:
-      - https://finance.{{.Values.domain}}/*
+      - https://{{.Values.appHosts.finance}}.{{.Values.domain}}/*
       webOrigins:
-      - https://finance.{{.Values.domain}}
+      - https://{{.Values.appHosts.finance}}.{{.Values.domain}}
       attributes:
         pkce.code.challenge.method: S256
-        post.logout.redirect.uris: https://finance.{{.Values.domain}}/*
+        post.logout.redirect.uris: https://{{.Values.appHosts.finance}}.{{.Values.domain}}/*
       protocolMappers:
       - name: groups
         protocol: openid-connect
@@ -230,15 +230,15 @@ spec:
       standardFlowEnabled: true
       implicitFlowEnabled: false
       protocol: openid-connect
-      rootUrl: https://hr.{{.Values.domain}}
-      baseUrl: https://hr.{{.Values.domain}}
+      rootUrl: https://{{.Values.appHosts.hr}}.{{.Values.domain}}
+      baseUrl: https://{{.Values.appHosts.hr}}.{{.Values.domain}}
       redirectUris:
-      - https://hr.{{.Values.domain}}/*
+      - https://{{.Values.appHosts.hr}}.{{.Values.domain}}/*
       webOrigins:
-      - https://hr.{{.Values.domain}}
+      - https://{{.Values.appHosts.hr}}.{{.Values.domain}}
       attributes:
         pkce.code.challenge.method: S256
-        post.logout.redirect.uris: https://hr.{{.Values.domain}}/*
+        post.logout.redirect.uris: https://{{.Values.appHosts.hr}}.{{.Values.domain}}/*
       protocolMappers:
       - name: groups
         protocol: openid-connect
@@ -258,15 +258,15 @@ spec:
       standardFlowEnabled: true
       implicitFlowEnabled: false
       protocol: openid-connect
-      rootUrl: https://learn.{{.Values.domain}}
-      baseUrl: https://learn.{{.Values.domain}}
+      rootUrl: https://{{.Values.appHosts.learn}}.{{.Values.domain}}
+      baseUrl: https://{{.Values.appHosts.learn}}.{{.Values.domain}}
       redirectUris:
-      - https://learn.{{.Values.domain}}/*
+      - https://{{.Values.appHosts.learn}}.{{.Values.domain}}/*
       webOrigins:
-      - https://learn.{{.Values.domain}}
+      - https://{{.Values.appHosts.learn}}.{{.Values.domain}}
       attributes:
         pkce.code.challenge.method: S256
-        post.logout.redirect.uris: https://learn.{{.Values.domain}}/*
+        post.logout.redirect.uris: https://{{.Values.appHosts.learn}}.{{.Values.domain}}/*
       protocolMappers:
       - name: groups
         protocol: openid-connect
@@ -286,15 +286,15 @@ spec:
       standardFlowEnabled: true
       implicitFlowEnabled: false
       protocol: openid-connect
-      rootUrl: https://desk.{{.Values.domain}}
-      baseUrl: https://desk.{{.Values.domain}}
+      rootUrl: https://{{.Values.appHosts.desk}}.{{.Values.domain}}
+      baseUrl: https://{{.Values.appHosts.desk}}.{{.Values.domain}}
       redirectUris:
-      - https://desk.{{.Values.domain}}/*
+      - https://{{.Values.appHosts.desk}}.{{.Values.domain}}/*
       webOrigins:
-      - https://desk.{{.Values.domain}}
+      - https://{{.Values.appHosts.desk}}.{{.Values.domain}}
       attributes:
         pkce.code.challenge.method: S256
-        post.logout.redirect.uris: https://desk.{{.Values.domain}}/*
+        post.logout.redirect.uris: https://{{.Values.appHosts.desk}}.{{.Values.domain}}/*
       protocolMappers:
       - name: groups
         protocol: openid-connect
@@ -314,15 +314,15 @@ spec:
       standardFlowEnabled: true
       implicitFlowEnabled: false
       protocol: openid-connect
-      rootUrl: https://tasks.{{.Values.domain}}
-      baseUrl: https://tasks.{{.Values.domain}}
+      rootUrl: https://{{.Values.appHosts.tasks}}.{{.Values.domain}}
+      baseUrl: https://{{.Values.appHosts.tasks}}.{{.Values.domain}}
       redirectUris:
-      - https://tasks.{{.Values.domain}}/*
+      - https://{{.Values.appHosts.tasks}}.{{.Values.domain}}/*
       webOrigins:
-      - https://tasks.{{.Values.domain}}
+      - https://{{.Values.appHosts.tasks}}.{{.Values.domain}}
       attributes:
         pkce.code.challenge.method: S256
-        post.logout.redirect.uris: https://tasks.{{.Values.domain}}/*
+        post.logout.redirect.uris: https://{{.Values.appHosts.tasks}}.{{.Values.domain}}/*
       protocolMappers:
       - name: groups
         protocol: openid-connect
@@ -342,15 +342,15 @@ spec:
       standardFlowEnabled: true
       implicitFlowEnabled: false
       protocol: openid-connect
-      rootUrl: https://wiki.{{.Values.domain}}
-      baseUrl: https://wiki.{{.Values.domain}}
+      rootUrl: https://{{.Values.appHosts.wiki}}.{{.Values.domain}}
+      baseUrl: https://{{.Values.appHosts.wiki}}.{{.Values.domain}}
       redirectUris:
-      - https://wiki.{{.Values.domain}}/*
+      - https://{{.Values.appHosts.wiki}}.{{.Values.domain}}/*
       webOrigins:
-      - https://wiki.{{.Values.domain}}
+      - https://{{.Values.appHosts.wiki}}.{{.Values.domain}}
       attributes:
         pkce.code.challenge.method: S256
-        post.logout.redirect.uris: https://wiki.{{.Values.domain}}/*
+        post.logout.redirect.uris: https://{{.Values.appHosts.wiki}}.{{.Values.domain}}/*
       protocolMappers:
       - name: groups
         protocol: openid-connect

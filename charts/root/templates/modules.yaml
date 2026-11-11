@@ -1,7 +1,12 @@
 {{- /*
-The modules, sync wave 10. One Application per enabled module: the chart
-from the main repository plus charts/module-extras (ExternalSecrets, access
-configuration).
+The modules, sync wave 5: the last wave, shared with Den. Argo CD waits for
+each wave to be Healthy before it applies the next one, but not for the
+last: Den and the modules are applied together and the root sync ends, so a
+Degraded module or Den never blocks the sync that delivers its fix. The
+modules wait for Den at runtime (den.mode: required) instead.
+One Application per enabled module: the chart from the main repository at
+the module's own release, plus charts/module-extras (ExternalSecrets,
+access configuration).
 */ -}}
 {{- $v := .Values }}
 {{- $meta := include "root.moduleMeta" . | fromYaml }}
@@ -17,14 +22,14 @@ metadata:
   labels:
     conservices.io/module: {{ $n }}
   annotations:
-    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/sync-wave: "5"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   sources:
     - repoURL: {{ $v.charts.repoURL }}
-      targetRevision: {{ $v.charts.targetRevision }}
+      targetRevision: {{ include "root.chartRevision" (dict "app" $n "version" $m.version "chartRevision" $m.chartRevision) }}
       path: deploy/charts/{{ $n }}
       helm:
         releaseName: {{ $n }}

@@ -4,7 +4,7 @@ app: stash
 namespace: conservices-stash
 # Enabled modules (HR only adds hooks for these).
 enabledModules: [stash, hr, rally, finance, learn, wiki, desk, tasks]
-# true: create the Secret ghcr-pull from OpenBao kv/infra/ghcr.
+# true: create the Secret ghcr-pull from OpenBao conservices/infra/ghcr.
 pullSecret: false
 # Access configuration (TOML). Empty: files/access-config/<app>.toml.
 accessConfig: ""

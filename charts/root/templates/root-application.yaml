@@ -1,8 +1,9 @@
 {{- /*
-The root Application itself. bootstrap/install-root.sh renders this one file
-from cluster.yaml and applies it; from then on it manages itself and every
-other Application of this chart.
-The finalizer makes `kubectl delete application root` delete the child
+The root Application itself (rootApplication.name, default
+conservices-stack). bootstrap/install-root renders this one file from
+cluster.yaml and applies it; from then on it manages itself and every other
+Application of this chart.
+The finalizer makes `kubectl delete application <name>` delete the child
 Applications too. The infrastructure Applications, platform-namespaces and
 postgres have no finalizer, so their workloads and data (PostgreSQL) keep
 running.
@@ -10,7 +11,7 @@ running.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: root
+  name: {{ .Values.rootApplication.name }}
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io

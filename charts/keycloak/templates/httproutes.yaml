@@ -12,7 +12,7 @@ spec:
       namespace: conservices-gateway
       sectionName: https
   hostnames:
-    - auth.{{ .Values.domain }}
+    - {{ .Values.host }}.{{ .Values.domain }}
   rules:
     - matches:
         - path:
@@ -41,7 +41,7 @@ spec:
       namespace: conservices-gateway
       sectionName: https
   hostnames:
-    - auth-admin.{{ .Values.domain }}
+    - {{ .Values.adminHost }}.{{ .Values.domain }}
   rules:
     - backendRefs:
         - name: keycloak-public

@@ -3,7 +3,8 @@
 # 1. Replace every "change-me" below. `grep -n change-me cluster.yaml`
 #    printing nothing means you are done.
 # 2. Set enabled: true for the modules you want (section "modules" below).
-# 3. Commit and push, then run bootstrap/install-root.sh.
+# 3. Commit and push, then run bootstrap/install-root.sh (Windows:
+#    bootstrap\install-root.ps1).
 #
 # Every other setting has a production default in charts/root/values.yaml.
 # To change one, copy its key here (same nesting) and set your value; this
@@ -12,8 +13,9 @@
 
 # --- Required ---------------------------------------------------------------
 
-# Your domain, e.g. example.org. Apps live on <app>.<domain>, Rally on
-# events.<domain>, sign-in on auth.<domain>.
+# Your domain, e.g. example.org. Apps live on <host>.<domain>: den, stash,
+# hr, events (Rally), finance, learn, wiki, desk, tasks, sign-in on auth.
+# Other host labels: see "Host names" at the end.
 domain: change-me
 
 git:
@@ -42,42 +44,69 @@ den:
   # age public key for Den's encrypted backups: run `age-keygen -o den-backup.key`
   # and copy the "Public key: age1..." line. Keep den-backup.key offline.
   backupAgeRecipients: change-me
+  # Den's release (image tag MAJOR.MINOR.PATCH-BUILD). Its chart is read at
+  # the tag den/v<MAJOR.MINOR.PATCH> of the main repository.
+  version: "1.0.0-1"
 
 # Pick the modules to run (Den is always deployed). Each module waits for Den
-# until you pair it from the Den dashboard.
+# until you pair it from the Den dashboard. version: the module's release;
+# its MAJOR (first number) must equal den.version's MAJOR.
 modules:
-  stash:   { enabled: false }   # inventory, sign-outs, Lost & Found
-  hr:      { enabled: false }   # people, departments, onboarding
-  rally:   { enabled: false }   # events and schedule (events.<domain>)
-  finance: { enabled: false }   # invoices and money tracking
-  learn:   { enabled: false }   # training courses and quizzes
-  wiki:    { enabled: false }   # pages in private and team spaces
-  desk:    { enabled: false }   # shared support inboxes
-  tasks:   { enabled: false }   # projects, task lists and boards
+  stash:   { enabled: false, version: "1.0.0-1" }   # inventory, sign-outs, Lost & Found
+  hr:      { enabled: false, version: "1.0.0-1" }   # people, departments, onboarding
+  rally:   { enabled: false, version: "1.0.0-1" }   # events and schedule (events.<domain>)
+  finance: { enabled: false, version: "1.0.0-1" }   # invoices and money tracking
+  learn:   { enabled: false, version: "1.0.0-1" }   # training courses and quizzes
+  wiki:    { enabled: false, version: "1.0.0-1" }   # pages in private and team spaces
+  desk:    { enabled: false, version: "1.0.0-1" }   # shared support inboxes
+  tasks:   { enabled: false, version: "1.0.0-1" }   # projects, task lists and boards
+
+# --- Recommended: fixed Gateway IPs -----------------------------------------
+# Pin both addresses from your cluster's Cilium LB IPAM pool. Unpinned,
+# Cilium may give the public and the internal Gateway each other's address
+# (for example after they are recreated); your router's port forward would
+# then expose the internal Gateway and the public sites would go dark.
+# gateway:
+#   public:
+#     loadBalancerIP: 192.0.2.240
+#   internal:
+#     loadBalancerIP: 192.0.2.241
 
 # --- Optional (uncomment to change a default) -------------------------------
 
-# Follow another branch or tag of your copy:
-# git:
+# 1 or 2 nodes: the small profile (NOT highly available: one PostgreSQL
+# instance, one Keycloak, downtime while a node reboots). Read
+# https://aglelectronics.github.io/con-services/deploy/sizing/#small-profile
+# profile: small
+
+# Host names: each app on <label>.<domain>. One label without dots each
+# (the wildcard certificate covers one level), all different. For Den and
+# the modules add the key to their entry ABOVE (a second "den:" or
+# "modules:" block would replace the first), e.g.
+#   den:   ... host: portal
+#   rally: { enabled: true, version: "1.0.0-1", host: events, submit: { enabled: true, host: submit } }
+# Keycloak:
+# keycloak:
+#   host: auth            # sign-in
+#   adminHost: auth-admin # admin console, internal Gateway only
+
+# Name of the root Application install-root creates (default
+# conservices-stack):
+# rootApplication:
+#   name: conservices-stack
+
+# Follow another branch or tag of your copy: add under "git:" ABOVE
 #   targetRevision: main
 
 # Switch to trusted certificates once the staging certificate works:
 # acme:
 #   issuer: letsencrypt-prod
 
-# Backups at another region or provider (recommended):
-# s3:
+# Backups at another region or provider (recommended): add under "s3:" ABOVE
 #   backup:
 #     endpoint: https://s3.other-region.example-provider.com
 #     region: other-region
 #     fqdns: ["s3.other-region.example-provider.com"]
-
-# Fixed Gateway IPs from your cluster's Cilium LB IPAM pool:
-# gateway:
-#   public:
-#     loadBalancerIP: 192.0.2.240
-#   internal:
-#     loadBalancerIP: 192.0.2.241
 
 # Longhorn: create longhorn-single and use it for PostgreSQL:
 # storage:
@@ -86,9 +115,12 @@ modules:
 
 # Your cluster's OpenBao and External Secrets Operator (prerequisites) are
 # not at the defaults (openbao-active.openbao.svc:8200, CA ConfigMap
-# openbao-ca, service account external-secrets/external-secrets):
+# openbao-ca, service account external-secrets/external-secrets), or the
+# Con Services secrets should live in another KV version 2 mount than
+# "conservices" (it holds modules/... and infra/...):
 # openbao:
 #   server: https://openbao-active.openbao.svc:8200
+#   kvPath: conservices
 #   caBundle:
 #     name: openbao-ca
 # externalSecrets:
@@ -96,7 +128,8 @@ modules:
 #   serviceAccount: external-secrets
 
 # OpenBao setup: by default Argo CD stops at the Application "openbao-setup"
-# until you review it and press Sync; its Job then enables the KV engine and
+# until you review it and press Sync; its Job then enables the KV engine
+# "conservices" (openbao.kvPath) and
 # writes External Secrets' role (the OpenBao administrator first runs
 # bootstrap/scripts/openbao-configure.sh once). External Secrets creates the
 # random secrets in any case. The template must not touch OpenBao's

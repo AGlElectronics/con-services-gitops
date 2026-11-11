@@ -1,6 +1,6 @@
 {{- if eq .Values.app "learn" }}
 # Secrets of Learn in conservices-learn, built by External Secrets from OpenBao
-# (ClusterSecretStore "openbao", KV v2 at "kv"). Nothing secret is in Git.
+# (ClusterSecretStore "openbao", KV v2 at "conservices", openbao.kvPath). Nothing secret is in Git.
 # Random values are created by External Secrets (charts/secret-store); S3
 # keys are entered by you (bootstrap/scripts/openbao-seed.sh).
 # Inventory: https://aglelectronics.github.io/con-services/operations/secrets/
@@ -37,22 +37,22 @@ spec:
   data:
     - secretKey: dbPassword
       remoteRef:
-        key: conservices/postgres/roles/learn
+        key: infra/postgres/roles/learn
         property: password
     - secretKey: s3AccessKey
       remoteRef:
-        key: conservices/learn/s3
+        key: modules/learn/s3
         property: access_key
     - secretKey: s3SecretKey
       remoteRef:
-        key: conservices/learn/s3
+        key: modules/learn/s3
         property: secret_key
     - secretKey: keycloakClientSecret
       remoteRef:
-        key: conservices/keycloak/clients
+        key: infra/keycloak/clients
         property: learn-provisioner
     - secretKey: learnToken
       remoteRef:
-        key: conservices/service-tokens/learn
+        key: modules/learn/service-token
         property: token
 {{- end }}

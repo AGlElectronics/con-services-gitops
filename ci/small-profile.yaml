@@ -1,0 +1,4 @@
+# Laid over examples/cluster.example-filled.yaml by CI: a 1 or 2 node
+# cluster with the small profile (not highly available). ci/cases.py checks
+# what the profile turns off.
+profile: small

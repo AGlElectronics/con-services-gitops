@@ -86,29 +86,9 @@ spec:
       ports:
         - { protocol: TCP, port: 5432 }
 ---
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: keycloak-operator
-  namespace: conservices-identity
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: keycloak-operator
-  policyTypes: [Ingress, Egress]
-  ingress: []
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: keycloak
-              app.kubernetes.io/instance: keycloak
-      ports:
-        - { protocol: TCP, port: 8443 }
-        - { protocol: TCP, port: 9000 }
----
 # Cilium-specific: the public Gateway (Envoy, identity "ingress") reaches
-# Keycloak, and the operator reaches the Kubernetes API.
+# Keycloak. The operator's own policies (Kubernetes API, Keycloak) are in
+# components/keycloak-operator: it must run before this chart is applied.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -126,16 +106,3 @@ spec:
         - ports:
             - port: "8443"
               protocol: TCP
----
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: keycloak-operator-apiserver
-  namespace: conservices-identity
-spec:
-  endpointSelector:
-    matchLabels:
-      app.kubernetes.io/name: keycloak-operator
-  egress:
-    - toEntities:
-        - kube-apiserver

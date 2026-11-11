@@ -28,13 +28,30 @@
     },
     "replicas": {"type": "integer", "minimum": 1},
     "k8sName": {"type": "string", "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"},
-    "imageTag": {"type": "string", "not": {"const": "latest"}},
+    "replicasOrProfile": {"type": ["integer", "null"], "minimum": 1, "description": "Empty: the value of the profile."},
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+-\\d+$",
+      "description": "Release of the app: image tag MAJOR.MINOR.PATCH-BUILD, never latest."
+    },
+    "chartRevision": {
+      "type": "string",
+      "pattern": "^\\S*$",
+      "description": "Git revision of charts.repoURL with the app's chart. Empty: the tag <app>/v<MAJOR.MINOR.PATCH>."
+    },
+    "host": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$",
+      "description": "One lowercase DNS label (no dots): the app lives on <host>.<domain>, covered by the wildcard certificate."
+    },
     "module": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "enabled": {"type": "boolean"},
-        "imageTag": {"$ref": "#/definitions/imageTag"},
+        "version": {"$ref": "#/definitions/version"},
+        "chartRevision": {"$ref": "#/definitions/chartRevision"},
+        "host": {"$ref": "#/definitions/host"},
         "accessConfig": {"type": "string"},
         "values": {"$ref": "#/definitions/values"}
       }
@@ -106,15 +123,24 @@
       "required": ["backupAgeRecipients"],
       "properties": {
         "backupAgeRecipients": {"$ref": "#/definitions/nonEmpty"},
-        "imageTag": {"$ref": "#/definitions/imageTag"},
+        "version": {"$ref": "#/definitions/version"},
+        "chartRevision": {"$ref": "#/definitions/chartRevision"},
+        "host": {"$ref": "#/definitions/host"},
         "values": {"$ref": "#/definitions/values"}
       }
     },
+    "rootApplication": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {"$ref": "#/definitions/k8sName"}
+      }
+    },
+    "profile": {"enum": ["standard", "small"]},
     "images": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "tag": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+-\\d+$"},
         "pullSecret": {
           "type": "object",
           "additionalProperties": false,
@@ -126,8 +152,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "repoURL": {"$ref": "#/definitions/nonEmpty"},
-        "targetRevision": {"$ref": "#/definitions/nonEmpty"}
+        "repoURL": {"$ref": "#/definitions/nonEmpty"}
       }
     },
     "modules": {
@@ -141,12 +166,17 @@
           "additionalProperties": false,
           "properties": {
             "enabled": {"type": "boolean"},
-            "imageTag": {"$ref": "#/definitions/imageTag"},
+            "version": {"$ref": "#/definitions/version"},
+            "chartRevision": {"$ref": "#/definitions/chartRevision"},
+            "host": {"$ref": "#/definitions/host"},
             "accessConfig": {"type": "string"},
             "submit": {
               "type": "object",
               "additionalProperties": false,
-              "properties": {"enabled": {"type": "boolean"}}
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "host": {"$ref": "#/definitions/host"}
+              }
             },
             "values": {"$ref": "#/definitions/values"}
           }
@@ -207,7 +237,11 @@
       "description": "How External Secrets Operator reaches the cluster's OpenBao (a prerequisite).",
       "properties": {
         "server": {"type": "string", "pattern": "^https://[^\\s/]+(:\\d+)?/?$"},
-        "kvPath": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$"},
+        "kvPath": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$",
+          "description": "Mount path of the KV version 2 engine that holds every Con Services entry (modules/..., infra/...). Default conservices."
+        },
         "caBundle": {
           "type": "object",
           "additionalProperties": false,
@@ -243,7 +277,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "instances": {"$ref": "#/definitions/replicas"},
+        "instances": {"$ref": "#/definitions/replicasOrProfile"},
         "resources": {"$ref": "#/definitions/resources"},
         "operatorNamespace": {"$ref": "#/definitions/k8sName"},
         "storage": {
@@ -275,7 +309,9 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "instances": {"$ref": "#/definitions/replicas"},
+        "host": {"$ref": "#/definitions/host"},
+        "adminHost": {"$ref": "#/definitions/host"},
+        "instances": {"$ref": "#/definitions/replicasOrProfile"},
         "resources": {"$ref": "#/definitions/resources"},
         "smtp": {
           "type": "object",

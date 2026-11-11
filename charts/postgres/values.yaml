@@ -1,5 +1,11 @@
-# Set by the root chart from cluster.yaml (postgres.*, s3.*, modules).
+# Set by the root chart from cluster.yaml (postgres.*, s3.*, modules, profile).
 instances: 3
+# required: never two instances on one node (extra instances stay Pending
+# with fewer nodes). preferred: spread when possible (profile small).
+podAntiAffinityType: required
+# CloudNativePG's PodDisruptionBudgets. false with profile small: with one
+# instance they would block every node drain.
+podDisruptionBudget: true
 resources:
   requests: { cpu: 250m, memory: 1Gi }
   limits: { cpu: "2", memory: 1Gi }

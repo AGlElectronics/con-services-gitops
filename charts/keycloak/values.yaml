@@ -1,9 +1,34 @@
-# Set by the root chart from cluster.yaml (domain, keycloak.*).
+# Set by the root chart from cluster.yaml (domain, keycloak.*, the app
+# host labels and the profile).
 domain: example.org
+# Host labels: sign-in on <host>.<domain>, admin console on
+# <adminHost>.<domain>.
+host: auth
+adminHost: auth-admin
+# Host label of every app, by realm client prefix (Rally's client is
+# events-spa, its submission site's rally-submit uses "submit"). Used for
+# the redirect URIs and web origins of the realm imports.
+appHosts:
+  den: den
+  stash: stash
+  hr: hr
+  events: events
+  finance: finance
+  learn: learn
+  wiki: wiki
+  desk: desk
+  tasks: tasks
+  submit: submit
 instances: 2
+# true: never two instances on one node while another node is free
+# (topology spread DoNotSchedule). false: spread when possible
+# (ScheduleAnyway), for 1 or 2 nodes.
+strictSpread: true
+# PodDisruptionBudget (minAvailable 1); only rendered with 2+ instances.
+podDisruptionBudget: true
 resources:
   requests: { cpu: 250m, memory: 1Gi }
   limits: { cpu: "2", memory: 2Gi }
 smtp:
-  # true: realms send mail through OpenBao kv/conservices/keycloak/smtp.
+  # true: realms send mail through OpenBao conservices/infra/keycloak/smtp.
   enabled: true

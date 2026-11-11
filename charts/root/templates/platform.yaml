@@ -1,11 +1,13 @@
 {{- /*
-The platform, sync waves 0 to 5: namespaces, Keycloak, PostgreSQL, Den.
+The platform, sync waves 0 to 4: namespaces, Keycloak, PostgreSQL. Den is
+in the last wave (5) together with the modules, see modules.yaml.
 The CloudNativePG operator and its Barman Cloud plugin are cluster
 prerequisites.
 */ -}}
 {{- $v := .Values }}
 {{- $meta := include "root.moduleMeta" . | fromYaml }}
 {{- $enabled := fromJsonArray (include "root.enabledModules" .) }}
+{{- $profile := include "root.profile" . | fromJson }}
 ---
 # Namespaces conservices-data and conservices-identity with their labels,
 # default-deny and DNS policies. No finalizer: deleting this
@@ -25,7 +27,9 @@ spec:
     server: https://kubernetes.default.svc
   {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
 ---
-# Keycloak Operator 26.8.2 (CRDs, RBAC, Deployment) in conservices-identity.
+# Keycloak Operator 26.8.2 (CRDs, RBAC, Deployment) in conservices-identity,
+# with its own network policies (API server egress): it must be Healthy
+# before Keycloak (wave 4) is applied.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -72,7 +76,9 @@ spec:
       {{- $roles := list "den" "keycloak" }}
       {{- range $n := $enabled }}{{ $roles = append $roles (index $meta $n).role }}{{ end }}
       {{- $pg := dict
-            "instances" $p.instances
+            "instances" ($profile.postgresInstances | int)
+            "podAntiAffinityType" (ternary "required" "preferred" $profile.strictSpread)
+            "podDisruptionBudget" (not $profile.small)
             "resources" $p.resources
             "storage" (dict
               "className" (include "root.selfReplicatingClass" (dict "root" $ "override" $p.storage.className))
@@ -95,8 +101,9 @@ spec:
     namespace: conservices-data
   {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
 ---
-# Keycloak: auth.<domain>, admin console auth-admin.<domain> (internal),
-# realms conservices (staff) and attendees.
+# Keycloak: <keycloak.host>.<domain>, admin console
+# <keycloak.adminHost>.<domain> (internal), realms conservices (staff) and
+# attendees.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -113,7 +120,18 @@ spec:
     helm:
       valuesObject:
         domain: {{ $v.domain }}
-        instances: {{ $v.keycloak.instances }}
+        host: {{ $v.keycloak.host }}
+        adminHost: {{ $v.keycloak.adminHost }}
+        # Host labels of the apps, by realm client prefix (Rally: events).
+        appHosts:
+          den: {{ $v.den.host }}
+          {{- range $n := splitList " " (include "root.moduleNames" .) }}
+          {{ (index $meta $n).label }}: {{ (index $v.modules $n).host }}
+          {{- end }}
+          submit: {{ $v.modules.rally.submit.host }}
+        instances: {{ $profile.keycloakInstances | int }}
+        strictSpread: {{ $profile.strictSpread }}
+        podDisruptionBudget: {{ not $profile.small }}
         resources: {{ toJson $v.keycloak.resources }}
         smtp: {{ toJson $v.keycloak.smtp }}
   destination:
@@ -121,7 +139,10 @@ spec:
     namespace: conservices-identity
   {{- include "root.syncPolicy" (dict "options" (list "ServerSideApply=true")) | nindent 2 }}
 ---
-# Den, the portal: backend, web app and operator (backups).
+# Den, the portal: backend, web app and operator (backups). The last wave,
+# shared with the modules: Argo CD does not wait for the health of the last
+# wave, so a Degraded Den or module never holds back the sync that delivers
+# its fix. The modules wait for Den at runtime (den.mode: required).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -140,7 +161,7 @@ spec:
   project: default
   sources:
     - repoURL: {{ $v.charts.repoURL }}
-      targetRevision: {{ $v.charts.targetRevision }}
+      targetRevision: {{ include "root.chartRevision" (dict "app" "den" "version" $v.den.version "chartRevision" $v.den.chartRevision) }}
       path: deploy/charts/den
       helm:
         releaseName: den

@@ -1,7 +1,7 @@
 # Set by the root chart from cluster.yaml (openbao.*, externalSecrets.*).
 openbao:
   server: https://openbao-active.openbao.svc:8200
-  kvPath: kv
+  kvPath: conservices
   caBundle:
     kind: ConfigMap
     name: openbao-ca

@@ -5,9 +5,10 @@
 # HA: 2 instances on different nodes. Sessions and caches are shared through
 # Infinispan; the instances find each other through the database (JDBC_PING,
 # the default cache stack since Keycloak 26.1) and talk on 7800/57800.
+# With the small profile: 1 instance, spread only when possible.
 #
 # Hostnames, instances and resources come from cluster.yaml (domain,
-# keycloak.*).
+# keycloak.*, profile).
 apiVersion: k8s.keycloak.org/v2beta1
 kind: Keycloak
 metadata:
@@ -39,8 +40,8 @@ spec:
     serviceName: keycloak
 
   hostname:
-    hostname: https://auth.{{ .Values.domain }}
-    admin: https://auth-admin.{{ .Values.domain }}
+    hostname: https://{{ .Values.host }}.{{ .Values.domain }}
+    admin: https://{{ .Values.adminHost }}.{{ .Values.domain }}
     strict: true
     # Backends may call Keycloak on its in-cluster name.
     backchannelDynamic: true
@@ -86,7 +87,7 @@ spec:
     topologySpreadConstraints:
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: DoNotSchedule
+        whenUnsatisfiable: {{ ternary "DoNotSchedule" "ScheduleAnyway" .Values.strictSpread }}
         labelSelector:
           matchLabels:
             app: keycloak

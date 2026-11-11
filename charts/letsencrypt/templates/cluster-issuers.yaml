@@ -34,7 +34,7 @@ spec:
 {{- if eq .Values.provider "cloudflare" }}
 ---
 # The Cloudflare API token cert-manager uses to create the DNS-01 TXT
-# records, from OpenBao kv/infra/cloudflare (property api-token), written by
+# records, from OpenBao conservices/infra/cloudflare (property api-token), written by
 # bootstrap/scripts/openbao-seed.sh. Scopes: Zone:DNS:Edit and
 # Zone:Zone:Read, for your zone only.
 apiVersion: external-secrets.io/v1

@@ -1,6 +1,6 @@
 {{- if eq .Values.app "den" }}
 # Secrets of Den in conservices-den, built by External Secrets from OpenBao
-# (ClusterSecretStore "openbao", KV v2 at "kv"). Nothing secret is in Git.
+# (ClusterSecretStore "openbao", KV v2 at "conservices", openbao.kvPath). Nothing secret is in Git.
 # Random values are created by External Secrets (charts/secret-store); S3
 # keys are entered by you (bootstrap/scripts/openbao-seed.sh).
 # Inventory: https://aglelectronics.github.io/con-services/operations/secrets/
@@ -37,23 +37,23 @@ spec:
   data:
     - secretKey: dbPassword
       remoteRef:
-        key: conservices/postgres/roles/den
+        key: infra/postgres/roles/den
         property: password
     - secretKey: s3AccessKey
       remoteRef:
-        key: conservices/den/s3
+        key: modules/den/s3
         property: access_key
     - secretKey: s3SecretKey
       remoteRef:
-        key: conservices/den/s3
+        key: modules/den/s3
         property: secret_key
     - secretKey: keycloakClientSecret
       remoteRef:
-        key: conservices/keycloak/clients
+        key: infra/keycloak/clients
         property: den-keycloak
     - secretKey: operatorToken
       remoteRef:
-        key: conservices/den/operator-token
+        key: modules/den/operator-token
         property: token
 ---
 apiVersion: external-secrets.io/v1
@@ -83,26 +83,26 @@ spec:
   data:
     - secretKey: operatorToken
       remoteRef:
-        key: conservices/den/operator-token
+        key: modules/den/operator-token
         property: token
     - secretKey: superuserPassword
       remoteRef:
-        key: conservices/postgres/superuser
+        key: infra/postgres/superuser
         property: password
     - secretKey: backupAccessKey
       remoteRef:
-        key: conservices/den/backup-s3
+        key: modules/den/backup-s3
         property: access_key
     - secretKey: backupSecretKey
       remoteRef:
-        key: conservices/den/backup-s3
+        key: modules/den/backup-s3
         property: secret_key
     - secretKey: filesAccessKey
       remoteRef:
-        key: conservices/den/files-s3
+        key: modules/den/files-s3
         property: access_key
     - secretKey: filesSecretKey
       remoteRef:
-        key: conservices/den/files-s3
+        key: modules/den/files-s3
         property: secret_key
 {{- end }}

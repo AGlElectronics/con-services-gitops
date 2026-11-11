@@ -10,6 +10,10 @@ kind: Kustomization
 
 resources:
   - https://github.com/keycloak/keycloak-k8s-resources//kubernetes?ref=26.8.2
+  # The operator's own network policies (Kubernetes API, Keycloak). Here and
+  # not in charts/keycloak: the operator must be Healthy before Keycloak's
+  # wave starts, and conservices-identity denies everything by default.
+  - networkpolicies.yaml
 
 # Like upstream: also move the ServiceAccount subjects of the
 # (Cluster)RoleBindings into our namespace.

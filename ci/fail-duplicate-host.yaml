@@ -1,0 +1,5 @@
+# Laid over examples/cluster.example-filled.yaml by CI: must FAIL, two
+# apps on the same host name.
+# expect: den.host and modules.hr.host both use the host hr.example.org
+den:
+  host: hr

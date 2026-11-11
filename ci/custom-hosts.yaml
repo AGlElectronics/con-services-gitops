@@ -1,0 +1,18 @@
+# Laid over examples/cluster.example-filled.yaml by CI: every host label
+# changed, and another name for the root Application. ci/cases.py checks
+# that no default host name is left in the rendered output.
+rootApplication:
+  name: con-stack
+den:
+  host: portal
+keycloak:
+  host: login
+  adminHost: login-admin
+modules:
+  stash: { host: inventory }
+  hr: { host: people }
+  rally:
+    host: con
+    submit: { enabled: true, host: cfp }
+  wiki: { host: docs }
+  tasks: { host: todo }
