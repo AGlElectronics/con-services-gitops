@@ -12,16 +12,25 @@
   - every OpenBao path an ExternalSecret or PushSecret uses is in the
     layout (modules/... or infra/...) and in the seed plan, and every
     seed plan entry is read by some ExternalSecret;
+  - in the Keycloak realm imports every public client has exactly one
+    audience mapper, with the audience of the generator's CLIENT_AUDIENCES,
+    on access tokens only, and every "groups" mapper sends full paths;
   - prints a sizing table (replicas x requests and limits, PVC sizes).
 
   python3 ci/check.py build/rendered [--sizing]
 """
 
+import importlib.util
 import json
 import pathlib
 import sys
 
 import yaml
+
+_spec = importlib.util.spec_from_file_location(
+    "keycloak_realm", pathlib.Path(__file__).resolve().parent.parent / "bootstrap/scripts/keycloak-realm.py")
+keycloak_realm = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(keycloak_realm)
 
 CPU_UNITS = {"m": 0.001}
 MEM_UNITS = {"Ki": 2**10, "Mi": 2**20, "Gi": 2**30, "Ti": 2**40, "K": 1e3, "M": 1e6, "G": 1e9}
@@ -192,12 +201,43 @@ def check_openbao_paths(out):
     return used
 
 
+def check_realm_mappers(out):
+    """Audience mappers on the public clients, full group paths."""
+    imports = [o for o in rendered(out, "keycloak") if o.get("kind") == "KeycloakRealmImport"]
+    if not imports:
+        errors.append("keycloak: no KeycloakRealmImport rendered")
+    clients = 0
+    for obj in imports:
+        realm = obj["spec"]["realm"]
+        name = realm.get("realm")
+        want = keycloak_realm.CLIENT_AUDIENCES.get(name, {})
+        for c in realm.get("clients") or []:
+            cid = c["clientId"]
+            where = f"keycloak: realm {name} client {cid}"
+            mappers = c.get("protocolMappers") or []
+            for m in mappers:
+                if m.get("protocolMapper") == "oidc-group-membership-mapper" and \
+                        str((m.get("config") or {}).get("full.path")).lower() != "true":
+                    errors.append(f"{where}: groups mapper {m.get('name')!r} without full.path true")
+            if not c.get("publicClient"):
+                continue
+            clients += 1
+            auds = [m for m in mappers if m.get("protocolMapper") == "oidc-audience-mapper"]
+            expected = keycloak_realm.audience_mapper(want[cid]) if cid in want else None
+            if expected is None:
+                errors.append(f"{where}: public client not in CLIENT_AUDIENCES (bootstrap/scripts/keycloak-realm.py)")
+            elif len(auds) != 1 or auds[0] != expected:
+                errors.append(f"{where}: audience mappers {auds}, want exactly {expected}")
+    return clients
+
+
 def main():
     out = pathlib.Path(sys.argv[1])
     sizing = "--sizing" in sys.argv
     pvcs = []
     module_count = check_den_pairing(out)
     openbao_refs = check_openbao_paths(out)
+    realm_clients = check_realm_mappers(out)
     for f in sorted(out.glob("*--*.yaml")):
         app = f.name.split("--")[0]
         for obj in yaml.safe_load_all(f.read_text(encoding="utf-8")):
@@ -267,6 +307,7 @@ def main():
     print(f"check: {len(rows)} containers with requests and limits, all images pinned")
     print(f"check: {module_count} module(s), each with den.mode required and listed in Den's preregisterModules")
     print(f"check: {openbao_refs} OpenBao references, all in the seed plan (modules/..., infra/...)")
+    print(f"check: {realm_clients} public realm clients, each with its one access-token audience; groups mappers send full paths")
 
 
 if __name__ == "__main__":

@@ -32,6 +32,17 @@ Both formats give:
     the app's sub-domain in the development realm (den, stash, events,
     submit, ...); cluster.yaml sets them (den.host, modules.<name>.host);
   - direct access grants (password grant) off for the public *-spa clients;
+  - on every public (web app) client exactly one audience mapper
+    "audience <app>-api" that adds the app's API to ACCESS tokens only
+    (CLIENT_AUDIENCES; added when the development realm lacks it).
+    This is not limited to modules enabled in cluster.yaml: the realm
+    already contains every module client, and Keycloak imports it once,
+    so a module turned on later must already have its mapper. A realm
+    imported earlier is updated by hand, and only for the modules about
+    to be upgraded (docs/realm-mappers.md);
+  - "groups" mappers with full group paths (full.path "true"; a top-level
+    group arrives as "/den-admin", which the modules normalise to
+    "den-admin");
   - client secrets and the SMTP login as ${PLACEHOLDERS}: helm fills them
     from the Secret keycloak-realm-secrets (OpenBao
     conservices/infra/keycloak/clients and conservices/infra/keycloak/smtp),
@@ -48,7 +59,8 @@ Usage (main repository checked out next to this one):
       --format json --domain con.example.org --out ./realm --smtp
 
 Needs PyYAML (pip install pyyaml). A realm import only creates a realm that
-does not exist yet; see deploy/identity.md for changing a running realm.
+does not exist yet. docs/realm-mappers.md is how to add the audience
+mappers and the full group paths on a realm that already exists.
 """
 
 import argparse
@@ -74,6 +86,43 @@ CLIENT_SECRETS = {
     "hr-provisioner": "HR_PROVISIONER_CLIENT_SECRET",
     "learn-provisioner": "LEARN_PROVISIONER_CLIENT_SECRET",
 }
+
+# Public (web app) client ID -> the audience its access tokens carry, per
+# realm. Same names as the development realms and the main repository's
+# docs/concepts/authentication.md (Audiences per API). Every public client
+# must be listed here. Not filtered by modules.*.enabled: see the module
+# docstring and docs/realm-mappers.md.
+CLIENT_AUDIENCES = {
+    "conservices": {
+        "den-spa": "den-api",
+        "hr-spa": "hr-api",
+        "stash-spa": "stash-api",
+        "events-spa": "events-api",
+        "learn-spa": "learn-api",
+        "finance-spa": "finance-api",
+        "desk-spa": "desk-api",
+        "tasks-spa": "tasks-api",
+        "wiki-spa": "wiki-api",
+    },
+    "attendees": {
+        "rally-submit": "events-public-api",
+    },
+}
+
+
+def audience_mapper(aud):
+    return {
+        "name": f"audience {aud}",
+        "protocol": "openid-connect",
+        "protocolMapper": "oidc-audience-mapper",
+        "consentRequired": False,
+        "config": {
+            "included.custom.audience": aud,
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true",
+        },
+    }
 
 # Staff accounts are created by HR (hr-provisioner), never by self-service
 # sign-up. The attendees realm keeps registration on (Rally's submissions).
@@ -114,6 +163,7 @@ infra/keycloak/{source}. Re-run the script instead of editing by hand.
 Imported once, when the realm does not exist yet. ${{...}} placeholders are
 filled from the Secret keycloak-realm-secrets (external-secrets.yaml).
 Docs: https://aglelectronics.github.io/con-services/deploy/identity/
+Running realm (audience mappers, full group paths): docs/realm-mappers.md
 */ -}}}}
 apiVersion: k8s.keycloak.org/v2beta1
 kind: KeycloakRealmImport
@@ -133,8 +183,30 @@ def is_local(value):
     return "localhost" in value or "127.0.0.1" in value
 
 
-def fix_client(client, used):
+def fix_mappers(client, realm_name):
+    """Full group paths; exactly one access-token-only audience mapper on a public client."""
+    cid = client["clientId"]
+    mappers = client.get("protocolMappers", [])
+    for m in mappers:
+        if m.get("protocolMapper") == "oidc-group-membership-mapper":
+            m.setdefault("config", {})["full.path"] = "true"
+    if not client.get("publicClient"):
+        return
+    aud = CLIENT_AUDIENCES.get(realm_name, {}).get(cid)
+    if aud is None:
+        sys.exit(f"public client {cid!r} in realm {realm_name!r} has no audience; add it to CLIENT_AUDIENCES")
+    others = [m for m in mappers if m.get("protocolMapper") == "oidc-audience-mapper"
+              and m.get("config", {}).get("included.custom.audience") != aud]
+    if others:
+        sys.exit(f"client {cid!r} has audience mappers for {[m['name'] for m in others]}; "
+                 f"it may carry only {aud!r}")
+    mappers = [m for m in mappers if m.get("protocolMapper") != "oidc-audience-mapper"]
+    client["protocolMappers"] = mappers + [audience_mapper(aud)]
+
+
+def fix_client(client, used, realm_name):
     client = copy.deepcopy(client)
+    fix_mappers(client, realm_name)
     for key in ("redirectUris", "webOrigins"):
         if key in client:
             client[key] = [v for v in client[key] if not is_local(v)]
@@ -198,7 +270,7 @@ def transform(realm, opts, smtp_display=None):
     realm["users"] = [u for u in realm.get("users", []) if u.get("serviceAccountClientId")]
     if not realm["users"]:
         del realm["users"]
-    realm["clients"] = [fix_client(c, used) for c in realm.get("clients", [])]
+    realm["clients"] = [fix_client(c, used, realm.get("realm")) for c in realm.get("clients", [])]
     if "displayName" in realm:
         realm["displayName"] = re.sub(r"\s*\(dev[^)]*\)", "", realm["displayName"], flags=re.I)
     realm["sslRequired"] = "all"

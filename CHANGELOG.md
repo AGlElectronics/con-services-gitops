@@ -103,7 +103,11 @@ First release of the template (1.0.0).
   sign-in route limited to `/realms/` and `/resources/`, the admin console
   on the internal Gateway, the Con Services login theme, and production
   realm imports (`conservices` and the attendee realm) without test users,
-  localhost URIs or development secrets. The login theme fetches the brand
+  localhost URIs or development secrets. Each public client has one audience
+  mapper that adds its API (`den-api`, `hr-api`, `stash-api`, `events-api`,
+  `learn-api`, `finance-api`, `desk-api`, `tasks-api`, `wiki-api`, and
+  `events-public-api` on `rally-submit`) to the access token only, and each
+  `groups` mapper sends the full path (`/den-admin`). The login theme fetches the brand
   from Den's public brand endpoint in the browser (`DEN_PUBLIC_URL` on
   Keycloak is set to Den's address). The staff realm has the group
   `den-ops` (who may run backups and drop databases in Den).
@@ -148,8 +152,9 @@ First release of the template (1.0.0).
   render of every Application, checks for requests, limits, pinned image
   tags and modules waiting for Den, strict validation against the
   Kubernetes and prerequisite CRD schemas, a check that every OpenBao path
-  is part of the seed plan, and a check that no installation-specific data
-  is committed.
+  is part of the seed plan, a check that every public Keycloak client has
+  its one access-token audience and that `groups` mappers send full paths,
+  and a check that no installation-specific data is committed.
 - Test renders for Den only, without the OpenBao setup Job, the small
   profile, custom host names, and backups on the same S3 service with
   custom realm settings, and cases the root chart must reject (a module
@@ -158,6 +163,24 @@ First release of the template (1.0.0).
 
 ### Changed
 
+- **BREAKING:** add the audience mappers before you upgrade Den or any
+  module that checks its audience (the app's changelog says when it
+  starts). Each web app client now has one mapper, named `audience <api>`,
+  that puts its API on the access token only, and each `groups` mapper
+  sends the full group path. A `KeycloakRealmImport` only creates a realm
+  that does not exist yet, so a realm imported from an earlier commit keeps
+  its old clients and a sync does not add the mappers. On that realm, add
+  the mapper for Den and for each module you are about to upgrade (and for
+  `rally-submit` in the `attendees` realm before the submission site checks
+  `events-public-api`); a module you are leaving disabled can wait until
+  you enable it. In the admin console: **Clients → \<client\> → Client
+  scopes → the dedicated scope → Add mapper → By configuration →
+  Audience**, **Included Custom Audience** = that API, **Add to access
+  token** on, **Add to ID token** off. Then set **Full group path** on the
+  `groups` mapper of each staff client. Sign in again afterwards. Steps,
+  one `kcadm.sh` command per client, and the failures (`401` invalid
+  audience, groups that stop matching) are in
+  [Audience mappers and group paths](docs/realm-mappers.md).
 - **BREAKING:** the realm imports now turn on brute-force protection
   (temporary lockout after 10 failed sign-ins) and a password policy (at
   least 12 characters, not the username, not the e-mail address) in both
@@ -210,7 +233,11 @@ First release of the template (1.0.0).
   their charts (`route.responseHeaders`).
 - Keycloak realms: brute-force protection and a password policy by
   default, no unused realm roles, and `den-keycloak` reduced to the one
-  role it needs (`manage-realm`), or none.
+  role it needs (`manage-realm`), or none. Each web app's access token
+  carries that app's API audience (`den-api`, `hr-api`, and the rest of
+  the table in
+  [Audience mappers and group paths](docs/realm-mappers.md)); the ID token
+  does not. Group mappers send the full path.
 - The bootstrap scripts pass tokens and secret values on standard input,
   never on a command line, never print a value (hidden answers show only
   their length and first and last four characters), and never store the

@@ -13,7 +13,7 @@ secrets.
 | `scripts/openbao-configure.sh`, `.ps1` | The OpenBao administrator's one-time step: Kubernetes auth, External Secrets' policy, and the narrow policy and role of the setup Job (with `openbao.setup.enabled: false`: the KV engine and External Secrets' role instead) | [Secrets with OpenBao](https://aglelectronics.github.io/con-services/deploy/secrets-openbao/#2-the-administrators-one-time-step) |
 | `scripts/openbao-seed.sh`, `.ps1` | Optional helper: asks for the provider credentials the enabled modules and options need (S3, SMTP, Cloudflare, registry), checks existing ones, lists what is missing (`--no-prompt` / `-NoPrompt`) and replaces wrong ones (`--overwrite` / `-Overwrite`); the OpenBao web UI works as well | [Secrets with OpenBao](https://aglelectronics.github.io/con-services/deploy/secrets-openbao/#4-enter-your-provider-credentials) |
 | `scripts/lib/openbao.sh`, `lib/openbao.ps1` | Helpers shared by the scripts (bash and PowerShell) | |
-| `scripts/keycloak-realm.py` | For maintainers: regenerates the realm templates of `charts/keycloak` from the development realms of the main repository | [Identity](https://aglelectronics.github.io/con-services/deploy/identity/#the-realms) |
+| `scripts/keycloak-realm.py` | For maintainers: regenerates the realm templates of `charts/keycloak` from the development realms of the main repository. Each public client gets one audience mapper, and group mappers send full paths | [Identity](https://aglelectronics.github.io/con-services/deploy/identity/#the-realms), [running realm](../docs/realm-mappers.md) |
 
 Argo CD, OpenBao, External Secrets Operator, cert-manager, trust-manager
 and CloudNativePG are cluster prerequisites: installing, upgrading, initialising and unsealing

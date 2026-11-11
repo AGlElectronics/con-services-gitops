@@ -4,6 +4,7 @@ infra/keycloak/realm-attendees.json. Re-run the script instead of editing by han
 Imported once, when the realm does not exist yet. ${...} placeholders are
 filled from the Secret keycloak-realm-secrets (external-secrets.yaml).
 Docs: https://aglelectronics.github.io/con-services/deploy/identity/
+Running realm (audience mappers, full group paths): docs/realm-mappers.md
 */ -}}
 apiVersion: k8s.keycloak.org/v2beta1
 kind: KeycloakRealmImport
@@ -49,6 +50,16 @@ spec:
       attributes:
         pkce.code.challenge.method: S256
         post.logout.redirect.uris: https://{{.Values.appHosts.submit}}.{{.Values.domain}}/*
+      protocolMappers:
+      - name: audience events-public-api
+        protocol: openid-connect
+        protocolMapper: oidc-audience-mapper
+        consentRequired: false
+        config:
+          included.custom.audience: events-public-api
+          id.token.claim: 'false'
+          access.token.claim: 'true'
+          introspection.token.claim: 'true'
     bruteForceProtected: {{ .Values.realm.bruteForce.enabled }}
     permanentLockout: {{ .Values.realm.bruteForce.permanentLockout }}
     failureFactor: {{ .Values.realm.bruteForce.failureFactor }}
