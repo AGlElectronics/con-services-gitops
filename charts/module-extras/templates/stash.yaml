@@ -2,12 +2,18 @@
 # Secrets of Stash in conservices-stash, built by External Secrets from OpenBao
 # (ClusterSecretStore "openbao", KV v2 at "conservices", openbao.kvPath). Nothing secret is in Git.
 # Random values are created by External Secrets (charts/secret-store); S3
-# keys are entered by you (bootstrap/scripts/openbao-seed.sh).
+# keys and the optional Telegram and SMTP values are entered by you
+# (bootstrap/scripts/openbao-seed.sh).
 # Inventory: https://aglelectronics.github.io/con-services/operations/secrets/
 #
 # DATABASE_URL: the role's password comes from the same OpenBao entry that
 # CloudNativePG uses for the role (charts/postgres), so they always
 # agree. Passwords are hex, so they need no escaping inside the URL.
+#
+# TELEGRAM_BOT_TOKEN and SMTP_PASSWORD are optional (remoteRef optional):
+# a missing OpenBao entry becomes an empty value and the feature stays off.
+# HR_SERVICE_TOKEN is included only when HR is enabled: one generated value,
+# the same key in hr-secrets, so HR can read the role catalog.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -31,6 +37,14 @@ spec:
         DEN_LINK_ENCRYPTION_KEY: "{{`{{ .denLinkKey }}`}}"
         S3_ACCESS_KEY_ID: "{{`{{ .s3AccessKey }}`}}"
         S3_SECRET_ACCESS_KEY: "{{`{{ .s3SecretKey }}`}}"
+        {{- if has "hr" .Values.enabledModules }}
+        # Same value as hr-secrets. Empty is not used: the key exists only
+        # when HR is enabled, and External Secrets generates it.
+        HR_SERVICE_TOKEN: "{{`{{ .hrServiceToken }}`}}"
+        {{- end }}
+        # Empty when the OpenBao entry does not exist yet.
+        TELEGRAM_BOT_TOKEN: "{{`{{ .telegramBotToken }}`}}"
+        SMTP_PASSWORD: "{{`{{ .smtpPassword }}`}}"
   data:
     - secretKey: denLinkKey
       remoteRef:
@@ -48,4 +62,20 @@ spec:
       remoteRef:
         key: modules/stash/s3
         property: secret_key
+    {{- if has "hr" .Values.enabledModules }}
+    - secretKey: hrServiceToken
+      remoteRef:
+        key: modules/hr/service-token
+        property: hr_service_token
+    {{- end }}
+    - secretKey: telegramBotToken
+      remoteRef:
+        key: modules/stash/telegram
+        property: token
+        optional: true
+    - secretKey: smtpPassword
+      remoteRef:
+        key: modules/stash/smtp
+        property: password
+        optional: true
 {{- end }}

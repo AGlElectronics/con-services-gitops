@@ -98,7 +98,7 @@ mask() {
 # check_value <kind> <value>: fails, printing the reason on stdout, when the
 # value cannot be right. Warnings for unusual but possible values go to
 # stderr. Kinds: s3-access, s3-secret, smtp-password, cloudflare,
-# ghcr-token, bao-token, text.
+# ghcr-token, bao-token, bot-token, text.
 check_value() {
   local kind=$1 v=$2 n=${#2}
   [[ -n "$v" ]] || { echo "is empty"; return 1; }
@@ -132,6 +132,9 @@ check_value() {
         || warn "not a classic token (ghp_...); ghcr.io needs a classic token with read:packages" ;;
     bao-token)
       ((n >= 8)) || { echo "is only $n characters long; OpenBao tokens are longer"; return 1; } ;;
+    bot-token)
+      ((n >= 20)) || { echo "is only $n characters long; a Telegram bot token is longer"; return 1; }
+      [[ "$v" == *:* ]] || { echo "has no colon; a Telegram bot token looks like 123456789:AA..."; return 1; } ;;
     smtp-password)
       if [[ "$v" == \\ ]]; then echo "is a single backslash; the paste probably failed"; return 1; fi
       if [[ "$v" == *\\* || "$v" =~ [[:space:]] ]]; then

@@ -150,7 +150,7 @@ function Get-MaskedValue([string]$Value) {
 
 # Test-ConValue: $null if the value can be right, else the reason. Warnings
 # for unusual but possible values are printed. Kinds: s3-access, s3-secret,
-# smtp-password, cloudflare, ghcr-token, bao-token, text.
+# smtp-password, cloudflare, ghcr-token, bao-token, bot-token, text.
 function Test-ConValue([string]$Kind, [string]$Value) {
     $n = $Value.Length
     if ($n -eq 0) { return 'is empty' }
@@ -176,6 +176,10 @@ function Test-ConValue([string]$Kind, [string]$Value) {
             if (-not $Value.StartsWith('ghp_')) { Write-Warn 'not a classic token (ghp_...); ghcr.io needs a classic token with read:packages' }
         }
         'bao-token' { if ($n -lt 8) { return "is only $n characters long; OpenBao tokens are longer" } }
+        'bot-token' {
+            if ($n -lt 20) { return "is only $n characters long; a Telegram bot token is longer" }
+            if ($Value -notmatch ':') { return 'has no colon; a Telegram bot token looks like 123456789:AA...' }
+        }
         'smtp-password' {
             if ($Value -eq '\') { return 'is a single backslash; the paste probably failed' }
             if ($Value.Contains('\') -or $Value -match '\s') { Write-Warn 'contains a backslash or a space; fine if your password really has one' }

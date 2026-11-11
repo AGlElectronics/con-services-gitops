@@ -127,6 +127,13 @@ that stay Degraded without it, and what the value is.
 {{- $manual = append $manual (dict "path" (printf "modules/%s/s3" .) "kind" "s3" "fields" $s3f "apps" (list .)
     "what" (printf "read and write on bucket %s-conservices-%s only" $prefix .)) }}
 {{- end }}
+{{- if has "stash" $enabled }}
+{{- /* Optional: a missing entry does not Degrade Stash. remoteRef optional on the ExternalSecret. */ -}}
+{{- $manual = append $manual (dict "path" "modules/stash/telegram" "kind" "telegram" "fields" (list "token") "apps" (list "stash") "optional" true
+    "what" "Lost and Found bot token from BotFather. Leave it unset and Telegram stays off. Do not share this bot with another module.") }}
+{{- $manual = append $manual (dict "path" "modules/stash/smtp" "kind" "password" "fields" (list "password") "apps" (list "stash") "optional" true
+    "what" "Password of the SMTP server in Stash settings. Leave it unset to send mail without a login.") }}
+{{- end }}
 {{- if $v.keycloak.smtp.enabled }}
 {{- $manual = append $manual (dict "path" "infra/keycloak/smtp" "kind" "smtp"
     "fields" (list "host" "port" "from" "username" "password") "apps" (list "keycloak")
@@ -144,6 +151,11 @@ that stay Degraded without it, and what the value is.
 {{- range $roles }}{{ $gen = append $gen (dict "path" (printf "infra/postgres/roles/%s" .) "properties" (list "password")) }}{{ end }}
 {{- $gen = append $gen (dict "path" "modules/den/operator-token" "properties" (list "token")) }}
 {{- range $tokens }}{{ $gen = append $gen (dict "path" (printf "modules/%s/service-token" .) "properties" (list "token")) }}{{ end }}
+{{- if has "hr" $enabled }}
+{{- /* Distinct property names: the shared "token" generator key is one value for every path that uses it. */ -}}
+{{- $gen = append $gen (dict "path" "modules/hr/service-token" "properties" (list "hr_service_token")) }}
+{{- $gen = append $gen (dict "path" "modules/hr/directory-token" "properties" (list "hr_directory_token")) }}
+{{- end }}
 {{- if has "desk" $enabled }}{{ $gen = append $gen (dict "path" "modules/desk/secret-key" "properties" (list "key")) }}{{ end }}
 {{- /* DEN_LINK_ENCRYPTION_KEY: 43 letters and digits, read as unpadded base64 = 32 bytes. */ -}}
 {{- range $enabled }}{{ $gen = append $gen (dict "path" (printf "modules/%s/den-link" .) "properties" (list "key") "generator" "aes-key") }}{{ end }}

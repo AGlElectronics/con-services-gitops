@@ -13,6 +13,8 @@
 #
 # Optional keys (SMTP_PASSWORD, TELEGRAM_BOT_TOKEN) are not included: add a
 # data entry and a template line here once the OpenBao entry exists.
+# HR_SERVICE_TOKEN is one generated value, copied into every module that
+# checks role-catalog calls (Wiki, Finance, Rally, Tasks, Stash, Learn, Desk).
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -34,6 +36,11 @@ spec:
         DATABASE_URL: "postgres://hr:{{`{{ .dbPassword }}`}}@conservices-pg-rw.conservices-data.svc.cluster.local:5432/hr?sslmode=verify-full&sslrootcert=/etc/conservices-internal-ca/ca.crt"
         # Encrypts the Den credential the module stores (shared denlink).
         DEN_LINK_ENCRYPTION_KEY: "{{`{{ .denLinkKey }}`}}"
+        # Bearer token HR sends to other modules' role catalogs. The same
+        # OpenBao value is copied into every module that checks it.
+        HR_SERVICE_TOKEN: "{{`{{ .hrServiceToken }}`}}"
+        # Wiki sends this to GET /api/internal/directory/groups.
+        HR_DIRECTORY_TOKEN: "{{`{{ .hrDirectoryToken }}`}}"
         KEYCLOAK_CLIENT_SECRET: "{{`{{ .keycloakClientSecret }}`}}"
         {{- if has "learn" .Values.enabledModules }}
         LEARN_SERVICE_TOKEN: "{{`{{ .learnToken }}`}}"
@@ -49,6 +56,14 @@ spec:
       remoteRef:
         key: modules/hr/den-link
         property: key
+    - secretKey: hrServiceToken
+      remoteRef:
+        key: modules/hr/service-token
+        property: hr_service_token
+    - secretKey: hrDirectoryToken
+      remoteRef:
+        key: modules/hr/directory-token
+        property: hr_directory_token
     - secretKey: dbPassword
       remoteRef:
         key: infra/postgres/roles/hr
@@ -75,4 +90,32 @@ spec:
         key: modules/tasks/service-token
         property: token
     {{- end }}
+{{- if .Values.googleWorkspace }}
+---
+# Optional Google Workspace service-account key. Store the JSON in OpenBao
+# at modules/hr/google-workspace, property credentials.json, then set
+# modules.hr.values.googleWorkspace.enabled: true. The HR chart mounts
+# Secret hr-google-workspace. The key is not generated: it comes from
+# Google Cloud.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: hr-google-workspace
+  namespace: conservices-hr
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: openbao
+  target:
+    name: hr-google-workspace
+    creationPolicy: Owner
+  data:
+    - secretKey: credentials.json
+      remoteRef:
+        key: modules/hr/google-workspace
+        property: credentials.json
+{{- end }}
 {{- end }}

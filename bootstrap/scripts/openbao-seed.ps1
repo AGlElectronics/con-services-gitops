@@ -18,6 +18,8 @@ openbao.kvPath (default "conservices"):
   conservices/modules/den/backup-s3      access_key, secret_key
   conservices/modules/<module>/s3        access_key, secret_key (stash rally
                                          learn wiki tasks, when enabled)
+  conservices/modules/stash/telegram     token (optional, when Stash is on)
+  conservices/modules/stash/smtp         password (optional, when Stash is on)
   conservices/infra/keycloak/smtp        host, port, from, username, password
   conservices/infra/cloudflare           api-token
   conservices/infra/ghcr                 username, token
@@ -162,6 +164,8 @@ function Add-Missing($e) {
 $checks = @{
     s3         = @(@('access_key', 's3-access', $false), @('secret_key', 's3-secret', $false))
     smtp       = @(@('host', 'text', $false), @('from', 'text', $false), @('password', 'smtp-password', $true))
+    telegram   = @(, @('token', 'bot-token', $false))
+    password   = @(, @('password', 'smtp-password', $false))
     cloudflare = @(, @('api-token', 'cloudflare', $false))
     ghcr       = @(@('username', 'text', $false), @('token', 'ghcr-token', $false))
 }
@@ -227,6 +231,22 @@ function Request-Smtp($e) {
     return $true
 }
 
+function Request-Telegram($e) {
+    $t = Read-ConValue -Prompt '  Bot token from @BotFather (hidden, empty = no Telegram)' -Kind 'bot-token' -Hidden -Optional
+    if (-not $t) { return $false }
+    Set-KvEntry $Token $e.path ([ordered]@{ token = $t })
+    $t = $null
+    return $true
+}
+
+function Request-Password($e) {
+    $pass = Read-ConValue -Prompt '  Password (hidden, empty = no SMTP login)' -Kind 'smtp-password' -Hidden -Optional
+    if (-not $pass) { return $false }
+    Set-KvEntry $Token $e.path ([ordered]@{ password = $pass })
+    $pass = $null
+    return $true
+}
+
 function Request-Cloudflare($e) {
     $t = Read-ConValue -Prompt '  API token (hidden, empty = skip)' -Kind 'cloudflare' -Hidden -Optional
     if (-not $t) { return $false }
@@ -248,6 +268,8 @@ function Request-Ghcr($e) {
 $sections = @{
     s3         = 'S3 keys (one per bucket, limited to that bucket)'
     smtp       = 'Mail server for Keycloak (SMTP)'
+    telegram   = 'Stash Lost and Found Telegram bot (optional)'
+    password   = 'Stash SMTP password (optional)'
     cloudflare = "Cloudflare API token (Let's Encrypt DNS-01)"
     ghcr       = 'GitHub Container Registry (private images)'
 }
@@ -267,8 +289,12 @@ foreach ($e in $entries) {
     }
     $data = $null
     if (-not $Prompt) {
-        Write-Bad "$Kv/$p is missing ($($e.fields -join ', ')); Application(s) $($e.apps -join ', ') stay Degraded"
-        Add-Missing $e
+        if ($e.optional) {
+            Write-Warn "$Kv/$p is not set ($($e.fields -join ', ')); optional, so the feature stays off"
+        } else {
+            Write-Bad "$Kv/$p is missing ($($e.fields -join ', ')); Application(s) $($e.apps -join ', ') stay Degraded"
+            Add-Missing $e
+        }
         continue
     }
     if ($exists) { Write-Log "$Kv/${p}: replacing it (empty answer = keep the current value)" } else { Write-Log "$Kv/$p" }
@@ -276,6 +302,8 @@ foreach ($e in $entries) {
     $ok = switch ($e.kind) {
         's3' { Request-S3 $e }
         'smtp' { Request-Smtp $e }
+        'telegram' { Request-Telegram $e }
+        'password' { Request-Password $e }
         'cloudflare' { Request-Cloudflare $e }
         'ghcr' { Request-Ghcr $e }
     }
@@ -285,6 +313,8 @@ foreach ($e in $entries) {
     } elseif ($exists) {
         Write-Warn "$Kv/${p}: nothing entered, keeping the current value"
         [void]$kept.Add($p)
+    } elseif ($e.optional) {
+        Write-Warn "$Kv/$p skipped; the feature stays off until the entry exists"
     } else {
         Write-Warn "$Kv/$p skipped; Application(s) $($e.apps -join ', ') stay Degraded until it exists"
         Add-Missing $e

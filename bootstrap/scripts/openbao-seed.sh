@@ -41,6 +41,8 @@
 #   conservices/modules/<module>/s3          access_key, secret_key, for the
 #                                            enabled modules with files
 #                                            (stash rally learn wiki tasks)
+#   conservices/modules/stash/telegram       token      (optional; Stash on)
+#   conservices/modules/stash/smtp           password   (optional; Stash on)
 #   conservices/infra/keycloak/smtp          host, port, from, username,
 #                                            password   (keycloak.smtp.enabled)
 #   conservices/infra/cloudflare             api-token  (acme.dns01.provider
@@ -116,10 +118,10 @@ log "Modules:  $modules"
 log "Mount:    $OPENBAO_KV/ (KV version 2)"
 
 # The entries a person enters, in order: path, kind, fields, Applications, description.
-PATHS=() KINDS=() FIELDS=() APPS=() WHATS=()
-while IFS=$'\t' read -r p k f a w; do
-  PATHS+=("$p") KINDS+=("$k") FIELDS+=("$f") APPS+=("$a") WHATS+=("$w")
-done < <(jqr -r '.manual[] | [.path, .kind, (.fields | join(", ")), (.apps | join(", ")), .what] | @tsv' <<<"$plan")
+PATHS=() KINDS=() FIELDS=() APPS=() WHATS=() OPTIONAL=()
+while IFS=$'\t' read -r p k f a w o; do
+  PATHS+=("$p") KINDS+=("$k") FIELDS+=("$f") APPS+=("$a") WHATS+=("$w") OPTIONAL+=("$o")
+done < <(jqr -r '.manual[] | [.path, .kind, (.fields | join(", ")), (.apps | join(", ")), .what, (.optional // false)] | @tsv' <<<"$plan")
 GENERATED=()
 while IFS= read -r p; do GENERATED+=("$p"); done < <(jqr -r '.generated[].path' <<<"$plan")
 
@@ -185,6 +187,8 @@ check_existing() {
   case "${KINDS[$i]}" in
     s3) spec="access_key:s3-access secret_key:s3-secret" ;;
     smtp) spec="host:text from:text password:smtp-password?" ;;
+    telegram) spec="token:bot-token" ;;
+    password) spec="password:smtp-password" ;;
     cloudflare) spec="api-token:cloudflare" ;;
     ghcr) spec="username:text token:ghcr-token" ;;
   esac
@@ -210,6 +214,8 @@ section_of() {
   case "$1" in
     s3) echo "S3 keys (one per bucket, limited to that bucket)" ;;
     smtp) echo "Mail server for Keycloak (SMTP)" ;;
+    telegram) echo "Stash Lost and Found Telegram bot (optional)" ;;
+    password) echo "Stash SMTP password (optional)" ;;
     cloudflare) echo "Cloudflare API token (Let's Encrypt DNS-01)" ;;
     ghcr) echo "GitHub Container Registry (private images)" ;;
   esac
@@ -278,10 +284,28 @@ ask_ghcr() {
   unset t
 }
 
+ask_telegram() {
+  local p=${PATHS[$1]} t
+  prompt_value t "  Bot token from @BotFather (hidden, empty = no Telegram): " bot-token 1 1 || return 1
+  [[ -n "$t" ]] || return 1
+  printf '%s\n' "$t" | put "$p" token || exit 1
+  unset t
+}
+
+ask_password() {
+  local p=${PATHS[$1]} pass
+  prompt_value pass "  Password (hidden, empty = no SMTP login): " smtp-password 1 1 || return 1
+  [[ -n "$pass" ]] || return 1
+  printf '%s\n' "$pass" | put "$p" password || exit 1
+  unset pass
+}
+
 ask_entry() {
   case "$1" in
     s3) ask_s3 "$2" ;;
     smtp) ask_smtp "$2" ;;
+    telegram) ask_telegram "$2" ;;
+    password) ask_password "$2" ;;
     cloudflare) ask_cloudflare "$2" ;;
     ghcr) ask_ghcr "$2" ;;
     *) bad "unknown kind of entry: $1"; return 1 ;;
@@ -306,8 +330,12 @@ for i in "${!PATHS[@]}"; do
   fi
   json=""
   if [[ "$PROMPT" == 0 ]]; then
-    bad "$OPENBAO_KV/$p is missing (${FIELDS[$i]}); Application(s) ${APPS[$i]} stay Degraded"
-    missing "$i"
+    if [[ "${OPTIONAL[$i]}" == true ]]; then
+      warn "$OPENBAO_KV/$p is not set (${FIELDS[$i]}); optional, so the feature stays off"
+    else
+      bad "$OPENBAO_KV/$p is missing (${FIELDS[$i]}); Application(s) ${APPS[$i]} stay Degraded"
+      missing "$i"
+    fi
     continue
   fi
 
@@ -325,8 +353,12 @@ for i in "${!PATHS[@]}"; do
     warn "$OPENBAO_KV/$p: nothing entered, keeping the current value"
     KEPT+=("$p")
   else
-    warn "$OPENBAO_KV/$p skipped; Application(s) ${APPS[$i]} stay Degraded until it exists"
-    missing "$i"
+    if [[ "${OPTIONAL[$i]}" == true ]]; then
+      warn "$OPENBAO_KV/$p skipped; the feature stays off until the entry exists"
+    else
+      warn "$OPENBAO_KV/$p skipped; Application(s) ${APPS[$i]} stay Degraded until it exists"
+      missing "$i"
+    fi
   fi
 done
 

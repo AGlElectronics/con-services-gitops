@@ -10,6 +10,16 @@ First release of the template (1.0.0).
 
 ### Added
 
+- Stash's ExternalSecret includes optional `TELEGRAM_BOT_TOKEN` and
+  `SMTP_PASSWORD`, from OpenBao `modules/stash/telegram` (`token`) and
+  `modules/stash/smtp` (`password`). `openbao-seed.sh` and `.ps1` ask for
+  them when Stash is enabled; leaving them unset does not Degrade Stash
+  (the features stay off). When HR and Stash are both enabled, External
+  Secrets generates `modules/hr/service-token` and puts the same
+  `HR_SERVICE_TOKEN` in `hr-secrets` and `stash-secrets`, so HR can read
+  Stash's role catalog. `DEN_LINK_ENCRYPTION_KEY` was already generated
+  per module.
+
 **Installation with Argo CD**
 
 - One settings file, `cluster.yaml`: domain, Git repository, Let's Encrypt,
