@@ -38,6 +38,7 @@
 #   conservices/modules/den/s3               access_key, secret_key
 #   conservices/modules/den/files-s3         access_key, secret_key (read only)
 #   conservices/modules/den/backup-s3        access_key, secret_key
+#   conservices/modules/den/smtp             password   (optional; not generated)
 #   conservices/modules/<module>/s3          access_key, secret_key, for the
 #                                            enabled modules with files
 #                                            (stash rally learn wiki tasks)
@@ -189,6 +190,7 @@ check_existing() {
     smtp) spec="host:text from:text password:smtp-password?" ;;
     telegram) spec="token:bot-token" ;;
     password) spec="password:smtp-password" ;;
+    den-smtp) spec="password:smtp-password" ;;
     cloudflare) spec="api-token:cloudflare" ;;
     ghcr) spec="username:text token:ghcr-token" ;;
   esac
@@ -216,6 +218,7 @@ section_of() {
     smtp) echo "Mail server for Keycloak (SMTP)" ;;
     telegram) echo "Telegram bot token (optional, one bot per module)" ;;
     password) echo "Stash SMTP password (optional)" ;;
+    den-smtp) echo "Den SMTP password (optional, shared by paired modules)" ;;
     cloudflare) echo "Cloudflare API token (Let's Encrypt DNS-01)" ;;
     ghcr) echo "GitHub Container Registry (private images)" ;;
     google) echo "Google Workspace service account for Desk (optional)" ;;
@@ -301,6 +304,14 @@ ask_password() {
   unset pass
 }
 
+ask_den_smtp() {
+  local p=${PATHS[$1]} pass
+  prompt_value pass "  Password Den's modules use (hidden, empty = no SMTP login): " smtp-password 1 1 || return 1
+  [[ -n "$pass" ]] || return 1
+  printf '%s\n' "$pass" | put "$p" password || exit 1
+  unset pass
+}
+
 ask_google() {
   local p=${PATHS[$1]} f
   prompt_value f "  Path to the service-account JSON (empty = skip; Desk stays on IMAP): " text 0 1 || return 1
@@ -316,6 +327,7 @@ ask_entry() {
     smtp) ask_smtp "$2" ;;
     telegram) ask_telegram "$2" ;;
     password) ask_password "$2" ;;
+    den-smtp) ask_den_smtp "$2" ;;
     cloudflare) ask_cloudflare "$2" ;;
     ghcr) ask_ghcr "$2" ;;
     google) ask_google "$2" ;;

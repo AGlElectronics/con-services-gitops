@@ -144,6 +144,9 @@ that stay Degraded without it, and what the value is.
 {{- $manual = append $manual (dict "path" "modules/desk/google" "kind" "google" "fields" (list "credentials.json") "apps" (list "desk") "optional" true
     "what" "Google Workspace service-account key (JSON) for Desk. Leave it unset to use IMAP only. Also authorise the scopes on the Google Workspace page, and set networkPolicy.google (the GitOps values turn that on).") }}
 {{- end }}
+{{- /* Optional: a missing entry does not Degrade Den. remoteRef optional on the ExternalSecret. Not generated. */ -}}
+{{- $manual = append $manual (dict "path" "modules/den/smtp" "kind" "den-smtp" "fields" (list "password") "apps" (list "den") "optional" true
+    "what" "Password of the shared SMTP server Den hands to paired modules. Leave it unset to send mail without a login. Den does not store it.") }}
 {{- if $v.keycloak.smtp.enabled }}
 {{- $manual = append $manual (dict "path" "infra/keycloak/smtp" "kind" "smtp"
     "fields" (list "host" "port" "from" "username" "password") "apps" (list "keycloak")

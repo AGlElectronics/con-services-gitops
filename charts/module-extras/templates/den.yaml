@@ -3,6 +3,9 @@
 # (ClusterSecretStore "openbao", KV v2 at "conservices", openbao.kvPath). Nothing secret is in Git.
 # Random values are created by External Secrets (charts/secret-store); S3
 # keys are entered by you (bootstrap/scripts/openbao-seed.sh).
+# DEN_SMTP_PASSWORD is optional (remoteRef optional): a missing OpenBao
+# entry becomes an empty value and modules send mail without a login.
+# It is not generated. Den does not store it in Postgres.
 # Inventory: https://aglelectronics.github.io/con-services/operations/secrets/
 #
 # DATABASE_URL: the role's password comes from the same OpenBao entry that
@@ -34,6 +37,8 @@ spec:
         S3_SECRET_ACCESS_KEY: "{{`{{ .s3SecretKey }}`}}"
         KEYCLOAK_CLIENT_SECRET: "{{`{{ .keycloakClientSecret }}`}}"
         OPERATOR_TOKEN: "{{`{{ .operatorToken }}`}}"
+        # Empty when the OpenBao entry does not exist yet.
+        DEN_SMTP_PASSWORD: "{{`{{ .smtpPassword }}`}}"
   data:
     - secretKey: dbPassword
       remoteRef:
@@ -55,6 +60,11 @@ spec:
       remoteRef:
         key: modules/den/operator-token
         property: token
+    - secretKey: smtpPassword
+      remoteRef:
+        key: modules/den/smtp
+        property: password
+        optional: true
 ---
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret

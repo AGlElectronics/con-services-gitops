@@ -16,6 +16,7 @@ openbao.kvPath (default "conservices"):
   conservices/modules/den/s3             access_key, secret_key
   conservices/modules/den/files-s3       access_key, secret_key (read only)
   conservices/modules/den/backup-s3      access_key, secret_key
+  conservices/modules/den/smtp           password (optional, not generated)
   conservices/modules/<module>/s3        access_key, secret_key (stash rally
                                          learn wiki tasks, when enabled)
   conservices/modules/stash/telegram     token (optional, when Stash is on)
@@ -248,6 +249,14 @@ function Request-Password($e) {
     return $true
 }
 
+function Request-DenSmtp($e) {
+    $pass = Read-ConValue -Prompt "  Password Den's modules use (hidden, empty = no SMTP login)" -Kind 'smtp-password' -Hidden -Optional
+    if (-not $pass) { return $false }
+    Set-KvEntry $Token $e.path ([ordered]@{ password = $pass })
+    $pass = $null
+    return $true
+}
+
 function Request-Cloudflare($e) {
     $t = Read-ConValue -Prompt '  API token (hidden, empty = skip)' -Kind 'cloudflare' -Hidden -Optional
     if (-not $t) { return $false }
@@ -281,6 +290,7 @@ $sections = @{
     smtp       = 'Mail server for Keycloak (SMTP)'
     telegram   = 'Telegram bot token (optional, one bot per module)'
     password   = 'Stash SMTP password (optional)'
+    'den-smtp' = "Den SMTP password (optional, shared by paired modules)"
     cloudflare = "Cloudflare API token (Let's Encrypt DNS-01)"
     ghcr       = 'GitHub Container Registry (private images)'
     google     = 'Google Workspace service account for Desk (optional)'
@@ -316,6 +326,7 @@ foreach ($e in $entries) {
         'smtp' { Request-Smtp $e }
         'telegram' { Request-Telegram $e }
         'password' { Request-Password $e }
+        'den-smtp' { Request-DenSmtp $e }
         'cloudflare' { Request-Cloudflare $e }
         'ghcr' { Request-Ghcr $e }
         'google' { Request-Google $e }
