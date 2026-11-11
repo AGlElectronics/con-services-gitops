@@ -131,6 +131,12 @@ that stay Degraded without it, and what the value is.
 {{- /* Optional: a missing entry does not Degrade Stash. remoteRef optional on the ExternalSecret. */ -}}
 {{- $manual = append $manual (dict "path" "modules/stash/telegram" "kind" "telegram" "fields" (list "token") "apps" (list "stash") "optional" true
     "what" "Lost and Found bot token from BotFather. Leave it unset and Telegram stays off. Do not share this bot with another module.") }}
+{{- end }}
+{{- if has "learn" $enabled }}
+{{- $manual = append $manual (dict "path" "modules/learn/telegram" "kind" "telegram" "fields" (list "token") "apps" (list "learn") "optional" true
+    "what" "Learn reminder bot token from BotFather. Leave it unset and Telegram stays off. Do not share this bot with another module. Turn on the chart's networkPolicy.telegram with it.") }}
+{{- end }}
+{{- if has "stash" $enabled }}
 {{- $manual = append $manual (dict "path" "modules/stash/smtp" "kind" "password" "fields" (list "password") "apps" (list "stash") "optional" true
     "what" "Password of the SMTP server in Stash settings. Leave it unset to send mail without a login.") }}
 {{- end }}
@@ -157,6 +163,7 @@ that stay Degraded without it, and what the value is.
 {{- $gen = append $gen (dict "path" "modules/hr/directory-token" "properties" (list "hr_directory_token")) }}
 {{- end }}
 {{- if has "desk" $enabled }}{{ $gen = append $gen (dict "path" "modules/desk/secret-key" "properties" (list "key")) }}{{ end }}
+{{- if has "learn" $enabled }}{{ $gen = append $gen (dict "path" "modules/learn/feedback-pepper" "properties" (list "pepper")) }}{{ end }}
 {{- /* DEN_LINK_ENCRYPTION_KEY: 43 letters and digits, read as unpadded base64 = 32 bytes. */ -}}
 {{- range $enabled }}{{ $gen = append $gen (dict "path" (printf "modules/%s/den-link" .) "properties" (list "key") "generator" "aes-key") }}{{ end }}
 {{- $gen = append $gen (dict "path" "infra/keycloak/bootstrap-admin" "properties" (list "password")) }}

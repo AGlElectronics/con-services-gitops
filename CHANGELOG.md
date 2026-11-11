@@ -10,6 +10,16 @@ First release of the template (1.0.0).
 
 ### Added
 
+- Learn's anonymous-feedback pepper is generated in OpenBao at
+  `modules/learn/feedback-pepper` (property `pepper`) and copied into
+  `learn-secrets` as `LEARN_FEEDBACK_PEPPER`. When HR is enabled, Learn's
+  secret also gets `HR_SERVICE_TOKEN` from `modules/hr/service-token`
+  (property `hr_service_token`). `TELEGRAM_BOT_TOKEN` is optional
+  (`modules/learn/telegram`, property `token`); leaving it unset keeps
+  Telegram off and does not Degrade Learn. Turn the Learn chart's
+  `networkPolicy.telegram` on together with that token.
+  `DEN_LINK_ENCRYPTION_KEY` was already generated for every module.
+
 - Stash's ExternalSecret includes optional `TELEGRAM_BOT_TOKEN` and
   `SMTP_PASSWORD`, from OpenBao `modules/stash/telegram` (`token`) and
   `modules/stash/smtp` (`password`). `openbao-seed.sh` and `.ps1` ask for

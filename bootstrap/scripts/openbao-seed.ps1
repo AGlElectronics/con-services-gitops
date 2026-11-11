@@ -268,7 +268,7 @@ function Request-Ghcr($e) {
 $sections = @{
     s3         = 'S3 keys (one per bucket, limited to that bucket)'
     smtp       = 'Mail server for Keycloak (SMTP)'
-    telegram   = 'Stash Lost and Found Telegram bot (optional)'
+    telegram   = 'Telegram bot token (optional, one bot per module)'
     password   = 'Stash SMTP password (optional)'
     cloudflare = "Cloudflare API token (Let's Encrypt DNS-01)"
     ghcr       = 'GitHub Container Registry (private images)'

@@ -9,8 +9,10 @@
 # CloudNativePG uses for the role (charts/postgres), so they always
 # agree. Passwords are hex, so they need no escaping inside the URL.
 #
-# Optional keys (SMTP_PASSWORD, TELEGRAM_BOT_TOKEN) are not included: add a
-# data entry and a template line here once the OpenBao entry exists.
+# TELEGRAM_BOT_TOKEN is optional (remoteRef optional): a missing OpenBao
+# entry becomes empty and Telegram stays off. SMTP_PASSWORD is not included.
+# HR_SERVICE_TOKEN is included when HR is enabled: the same generated value
+# as hr-secrets, so HR can read Learn's role catalog.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -36,6 +38,14 @@ spec:
         S3_SECRET_ACCESS_KEY: "{{`{{ .s3SecretKey }}`}}"
         KEYCLOAK_CLIENT_SECRET: "{{`{{ .keycloakClientSecret }}`}}"
         LEARN_SERVICE_TOKEN: "{{`{{ .learnToken }}`}}"
+        # Anonymous-feedback dedupe hash.
+        LEARN_FEEDBACK_PEPPER: "{{`{{ .feedbackPepper }}`}}"
+        # Empty when the OpenBao entry does not exist yet.
+        TELEGRAM_BOT_TOKEN: "{{`{{ .telegramBotToken }}`}}"
+        {{- if has "hr" .Values.enabledModules }}
+        # Same value as hr-secrets. HR reads this catalog with it.
+        HR_SERVICE_TOKEN: "{{`{{ .hrServiceToken }}`}}"
+        {{- end }}
   data:
     - secretKey: denLinkKey
       remoteRef:
@@ -61,4 +71,19 @@ spec:
       remoteRef:
         key: modules/learn/service-token
         property: token
+    - secretKey: feedbackPepper
+      remoteRef:
+        key: modules/learn/feedback-pepper
+        property: pepper
+    - secretKey: telegramBotToken
+      remoteRef:
+        key: modules/learn/telegram
+        property: token
+        optional: true
+    {{- if has "hr" .Values.enabledModules }}
+    - secretKey: hrServiceToken
+      remoteRef:
+        key: modules/hr/service-token
+        property: hr_service_token
+    {{- end }}
 {{- end }}

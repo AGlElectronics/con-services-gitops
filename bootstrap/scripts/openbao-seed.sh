@@ -214,7 +214,7 @@ section_of() {
   case "$1" in
     s3) echo "S3 keys (one per bucket, limited to that bucket)" ;;
     smtp) echo "Mail server for Keycloak (SMTP)" ;;
-    telegram) echo "Stash Lost and Found Telegram bot (optional)" ;;
+    telegram) echo "Telegram bot token (optional, one bot per module)" ;;
     password) echo "Stash SMTP password (optional)" ;;
     cloudflare) echo "Cloudflare API token (Let's Encrypt DNS-01)" ;;
     ghcr) echo "GitHub Container Registry (private images)" ;;
