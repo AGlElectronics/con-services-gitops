@@ -133,7 +133,16 @@ jobs:
           python ci/check.py build/rendered-hosts
           python ci/cases.py hosts build/rendered-hosts
 
-      - name: Root chart rejects bad settings (version mismatch, hosts)
+      - name: Backups on the same S3 warn; realm settings from cluster.yaml
+        working-directory: gitops
+        run: |
+          set -euo pipefail
+          python ci/render.py --values "$VALUES_FILE" --values ci/same-s3-backups.yaml \
+            --main-repo ../con-services --out build/rendered-same-s3
+          python ci/check.py build/rendered-same-s3
+          python ci/cases.py same-s3 build/rendered-same-s3
+
+      - name: Root chart rejects bad settings (version mismatch, hosts, password policy)
         working-directory: gitops
         run: python ci/cases.py failures
 

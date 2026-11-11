@@ -111,7 +111,12 @@ if ! git -C "$REPO_ROOT" diff --quiet -- cluster.yaml 2>/dev/null; then
 fi
 
 printf '%s\n' "$manifest" | kubectl apply -f -
-setup="$(jq -r '.setup.enabled' <<<"$(seed_plan "$CLUSTER_FILE")")"
+plan="$(seed_plan "$CLUSTER_FILE")"
+setup="$(jq -r '.setup.enabled' <<<"$plan")"
+if [[ "$(jq -r '.backupSameAsData' <<<"$plan")" == "true" ]]; then
+  warn "backups go to the same S3 service as the live data (s3.backup is empty or equals s3.endpoint)." \
+       "Set s3.backup to another provider or account: https://aglelectronics.github.io/con-services/operations/databases-and-backups/#where-backups-go"
+fi
 
 ok "Root Application \"$name\" applied."
 n=0

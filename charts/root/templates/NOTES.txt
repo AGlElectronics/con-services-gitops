@@ -1,0 +1,5 @@
+Con Services root chart for {{ .Values.domain }}.
+{{- if (include "root.s3" . | fromYaml).backupSameAsData }}
+
+WARNING: {{ include "root.backupWarning" . }}
+{{- end }}

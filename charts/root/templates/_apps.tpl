@@ -113,6 +113,9 @@ operatorConfig:
   BACKUP_S3_BUCKET: {{ printf "%s-den-backups" $s3.prefix | quote }}
   BACKUP_S3_USE_PATH_STYLE: {{ $s3.backupPathStyle | quote }}
   BACKUP_AGE_RECIPIENTS: {{ $v.den.backupAgeRecipients | quote }}
+  # "true": backups share the live data's S3 service; Den warns on its
+  # Backups page.
+  BACKUP_SAME_STORAGE_AS_DATA: {{ $s3.backupSameAsData | toString | quote }}
   FILES_S3_ENDPOINT: {{ $s3.endpoint | quote }}
   FILES_S3_REGION: {{ $s3.region | quote }}
   FILES_S3_USE_PATH_STYLE: {{ $s3.pathStyle | quote }}

@@ -17,6 +17,13 @@
       left anywhere, the custom ones present, the root Application named
       after rootApplication.name.
 
+  python3 ci/cases.py same-s3 build/rendered-same-s3
+      Output of ci/render.py with ci/same-s3-backups.yaml: the Den
+      Application carries the backup warning, Den's operator gets
+      BACKUP_SAME_STORAGE_AS_DATA "true", Den's realm sync is off
+      (KEYCLOAK_ADMIN_URL empty, den-keycloak without realm-management
+      roles) and the password policy says length(16).
+
 Needs helm on PATH and PyYAML.
 """
 
@@ -118,13 +125,40 @@ def hosts(out):
     print("custom hosts: checked")
 
 
+def same_s3(out):
+    den = apps(out).get("den")
+    info = {i.get("name"): i.get("value", "") for i in (den or {}).get("spec", {}).get("info") or []}
+    if "s3.backup" not in info.get("Warning: backups", ""):
+        errors.append(f"root.yaml: Application den has no backup warning in spec.info ({info})")
+    configs = {d["metadata"]["name"]: d.get("data") or {} for d in docs(out / "den--0.yaml") if d.get("kind") == "ConfigMap"}
+    if configs.get("den-operator-config", {}).get("BACKUP_SAME_STORAGE_AS_DATA") != "true":
+        errors.append("den--0.yaml: den-operator-config BACKUP_SAME_STORAGE_AS_DATA is not \"true\"")
+    if configs.get("den-config", {}).get("KEYCLOAK_ADMIN_URL", "missing") != "":
+        errors.append("den--0.yaml: den-config KEYCLOAK_ADMIN_URL is not empty with denDisplayNameSync false")
+    realm = next((d["spec"]["realm"] for d in docs(out / "keycloak--0.yaml")
+                  if d.get("kind") == "KeycloakRealmImport" and d["metadata"]["name"] == "conservices"), None)
+    if realm is None:
+        errors.append("keycloak--0.yaml: no KeycloakRealmImport conservices")
+        return
+    sa = next((u for u in realm.get("users", []) if u.get("serviceAccountClientId") == "den-keycloak"), {})
+    if (sa.get("clientRoles") or {}).get("realm-management") != []:
+        errors.append(f"realm conservices: den-keycloak roles {sa.get('clientRoles')}, want none")
+    if not str(realm.get("passwordPolicy", "")).startswith("length(16)"):
+        errors.append(f"realm conservices: passwordPolicy {realm.get('passwordPolicy')!r}, want length(16) ...")
+    if realm.get("bruteForceProtected") is not True:
+        errors.append("realm conservices: bruteForceProtected is not true")
+    if "roles" in realm:
+        errors.append(f"realm conservices: realm roles left: {realm['roles']}")
+    print("backups on the same S3, realm settings: checked")
+
+
 def main():
-    if len(sys.argv) < 2 or sys.argv[1] not in ("failures", "small", "hosts"):
+    if len(sys.argv) < 2 or sys.argv[1] not in ("failures", "small", "hosts", "same-s3"):
         sys.exit(__doc__)
     if sys.argv[1] == "failures":
         failures()
     else:
-        {"small": small, "hosts": hosts}[sys.argv[1]](pathlib.Path(sys.argv[2]))
+        {"small": small, "hosts": hosts, "same-s3": same_s3}[sys.argv[1]](pathlib.Path(sys.argv[2]))
     if errors:
         print("\n".join(errors), file=sys.stderr)
         print(f"\n{len(errors)} problem(s)", file=sys.stderr)

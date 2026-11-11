@@ -165,7 +165,12 @@ if (Get-Command git -ErrorAction SilentlyContinue) {
 
 $manifest | kubectl apply -f -
 if ($LASTEXITCODE -ne 0) { Stop-Script "kubectl apply failed (see above)" }
-$setup = (Get-SeedPlan).setup.enabled
+$plan = Get-SeedPlan
+$setup = $plan.setup.enabled
+if ($plan.backupSameAsData) {
+    Write-Warn ("backups go to the same S3 service as the live data (s3.backup is empty or equals s3.endpoint). " +
+        "Set s3.backup to another provider or account: https://aglelectronics.github.io/con-services/operations/databases-and-backups/#where-backups-go")
+}
 
 Write-Ok "Root Application `"$name`" applied."
 $script:n = 0

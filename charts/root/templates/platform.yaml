@@ -160,6 +160,12 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
+  {{- if (include "root.s3" . | fromYaml).backupSameAsData }}
+  # Shown on the Application's page in Argo CD.
+  info:
+    - name: "Warning: backups"
+      value: {{ include "root.backupWarning" . | quote }}
+  {{- end }}
   sources:
     - repoURL: {{ $v.charts.repoURL }}
       targetRevision: {{ include "root.chartRevision" (dict "app" "den" "version" $v.den.version "chartRevision" $v.den.chartRevision) }}

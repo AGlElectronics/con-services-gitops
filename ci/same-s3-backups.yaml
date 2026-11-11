@@ -1,0 +1,14 @@
+# Laid over examples/cluster.example-filled.yaml by CI: backups on the same
+# S3 service as the live data (a warning, not an error), Den's realm
+# display-name sync off and a longer password policy. ci/cases.py checks
+# the warning, Den's flag and the realm.
+s3:
+  backup:
+    endpoint: ""
+    region: ""
+    fqdns: []
+keycloak:
+  realm:
+    denDisplayNameSync: false
+    passwordPolicy:
+      minLength: 16

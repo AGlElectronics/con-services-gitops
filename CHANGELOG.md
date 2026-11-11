@@ -130,6 +130,16 @@ First release of the template (1.0.0).
   deleting an Application or disabling a module never deletes data.
 - `examples/cluster.example-filled.yaml`, a complete example with
   `example.org`.
+- Backups on the same S3 service as the live data (`s3.backup.endpoint`
+  empty or equal to `s3.endpoint`) are allowed but warned about: the Den
+  Application shows *Warning: backups* in Argo CD (`spec.info`),
+  `install-root` prints a warning, and Den's operator gets
+  `BACKUP_SAME_STORAGE_AS_DATA: "true"` so Den can warn on its Backups
+  page.
+- `bootstrap/scripts/keycloak-realm.py --format json --domain <domain>`
+  writes the clean production realms as plain JSON for the Docker
+  production path (`kc.sh start --import-realm`), with the same hardening
+  as the realm imports here.
 
 **CI**
 

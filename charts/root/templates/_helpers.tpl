@@ -159,6 +159,7 @@ that stay Degraded without it, and what the value is.
   "serviceTokens" $tokens
   "generated" $gen
   "desk" (has "desk" $enabled)
+  "backupSameAsData" (include "root.s3" . | fromYaml).backupSameAsData
   "smtp" $v.keycloak.smtp.enabled
   "cloudflare" (eq $v.acme.dns01.provider "cloudflare")
   "ghcr" $v.images.pullSecret.enabled
@@ -263,6 +264,12 @@ backupEndpoint: {{ $b.endpoint | default $s.endpoint | quote }}
 backupRegion: {{ $b.region | default $s.region | quote }}
 backupPathStyle: {{ (ternary $s.pathStyle $b.pathStyle (kindIs "invalid" $b.pathStyle)) | toString | quote }}
 backupFqdns: {{ toJson (uniq (concat $s.fqdns $b.fqdns)) }}
+backupSameAsData: {{ or (empty $b.endpoint) (eq (trimSuffix "/" $b.endpoint) (trimSuffix "/" $s.endpoint)) }}
+{{- end }}
+
+{{/* Warning shown when backups go to the same S3 service as the live data. */}}
+{{- define "root.backupWarning" -}}
+Backups go to the same S3 service as the live data (s3.backup.endpoint is empty or equals s3.endpoint). One provider outage, a lost account or a leaked key then takes the data and its backups together. Set s3.backup in cluster.yaml to another provider or account: https://aglelectronics.github.io/con-services/operations/databases-and-backups/#where-backups-go
 {{- end }}
 
 {{/* Common labels of Con Services namespaces. Argument: dict tier, module. */}}
