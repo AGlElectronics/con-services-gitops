@@ -169,6 +169,7 @@ fi
 header "3. KV version 2 engine $OPENBAO_KV/"
 mounts="$(bao_cmd "$TOKEN" bao secrets list -format=json)"
 if jq -e --arg m "$OPENBAO_KV/" 'has($m)' <<<"$mounts" >/dev/null; then
+  # shellcheck disable=SC2016 # $m is a jq variable, not a shell one
   version="$(jqr -r --arg m "$OPENBAO_KV/" '.[$m].options.version // "1"' <<<"$mounts")"
   [[ "$version" == "2" ]] || die "$OPENBAO_KV/ exists but is KV version $version; Con Services needs version 2"
   good "KV v2 engine $OPENBAO_KV/ already enabled"

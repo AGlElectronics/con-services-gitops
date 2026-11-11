@@ -166,7 +166,7 @@ s3_reuse() {
 s3_remember() {
   local i
   for i in "${!S3_PATHS[@]}"; do
-    if [[ "${S3_PATHS[$i]}" == "$1" ]]; then S3_KEYS[$i]=$2; return; fi
+    if [[ "${S3_PATHS[$i]}" == "$1" ]]; then S3_KEYS[i]=$2; return; fi
   done
   S3_PATHS+=("$1") S3_KEYS+=("$2")
 }
