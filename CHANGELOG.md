@@ -89,6 +89,12 @@ First release of the template (1.0.0).
   bootstrap admin password) through PushSecrets and never replaces an
   existing value. The `ClusterSecretStore` `openbao` connects it to the
   cluster's OpenBao (`openbao.*`, `externalSecrets.*`).
+- Every enabled module gets its own `DEN_LINK_ENCRYPTION_KEY` (the key
+  that encrypts the Den credential the module stores), generated in
+  OpenBao at `conservices/modules/<module>/den-link` (property `key`, 43
+  letters and digits = 32 bytes as unpadded base64) and wired into the
+  module's `<module>-secrets`. A module built on the shared `denlink`
+  refuses to start without it.
 
 **Platform**
 

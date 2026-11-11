@@ -145,6 +145,8 @@ that stay Degraded without it, and what the value is.
 {{- $gen = append $gen (dict "path" "modules/den/operator-token" "properties" (list "token")) }}
 {{- range $tokens }}{{ $gen = append $gen (dict "path" (printf "modules/%s/service-token" .) "properties" (list "token")) }}{{ end }}
 {{- if has "desk" $enabled }}{{ $gen = append $gen (dict "path" "modules/desk/secret-key" "properties" (list "key")) }}{{ end }}
+{{- /* DEN_LINK_ENCRYPTION_KEY: 43 letters and digits, read as unpadded base64 = 32 bytes. */ -}}
+{{- range $enabled }}{{ $gen = append $gen (dict "path" (printf "modules/%s/den-link" .) "properties" (list "key") "generator" "aes-key") }}{{ end }}
 {{- $gen = append $gen (dict "path" "infra/keycloak/bootstrap-admin" "properties" (list "password")) }}
 {{- $gen = append $gen (dict "path" "infra/keycloak/clients" "properties" (list "den-keycloak" "hr-provisioner" "learn-provisioner")) }}
 {{- $s3 := list }}

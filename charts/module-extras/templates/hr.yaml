@@ -32,6 +32,8 @@ spec:
       engineVersion: v2
       data:
         DATABASE_URL: "postgres://hr:{{`{{ .dbPassword }}`}}@conservices-pg-rw.conservices-data.svc.cluster.local:5432/hr?sslmode=verify-full&sslrootcert=/etc/conservices-internal-ca/ca.crt"
+        # Encrypts the Den credential the module stores (shared denlink).
+        DEN_LINK_ENCRYPTION_KEY: "{{`{{ .denLinkKey }}`}}"
         KEYCLOAK_CLIENT_SECRET: "{{`{{ .keycloakClientSecret }}`}}"
         {{- if has "learn" .Values.enabledModules }}
         LEARN_SERVICE_TOKEN: "{{`{{ .learnToken }}`}}"
@@ -43,6 +45,10 @@ spec:
         DEPARTMENT_HOOKS: "https://tasks-backend.conservices-tasks.svc.cluster.local:8080/api/internal/departments|{{`{{ .tasksToken }}`}}"
         {{- end }}
   data:
+    - secretKey: denLinkKey
+      remoteRef:
+        key: modules/hr/den-link
+        property: key
     - secretKey: dbPassword
       remoteRef:
         key: infra/postgres/roles/hr

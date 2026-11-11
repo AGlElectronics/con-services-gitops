@@ -26,7 +26,13 @@ spec:
       engineVersion: v2
       data:
         DATABASE_URL: "postgres://finance:{{`{{ .dbPassword }}`}}@conservices-pg-rw.conservices-data.svc.cluster.local:5432/finance?sslmode=verify-full&sslrootcert=/etc/conservices-internal-ca/ca.crt"
+        # Encrypts the Den credential the module stores (shared denlink).
+        DEN_LINK_ENCRYPTION_KEY: "{{`{{ .denLinkKey }}`}}"
   data:
+    - secretKey: denLinkKey
+      remoteRef:
+        key: modules/finance/den-link
+        property: key
     - secretKey: dbPassword
       remoteRef:
         key: infra/postgres/roles/finance

@@ -27,10 +27,16 @@ spec:
       engineVersion: v2
       data:
         DATABASE_URL: "postgres://wiki:{{`{{ .dbPassword }}`}}@conservices-pg-rw.conservices-data.svc.cluster.local:5432/wiki?sslmode=verify-full&sslrootcert=/etc/conservices-internal-ca/ca.crt"
+        # Encrypts the Den credential the module stores (shared denlink).
+        DEN_LINK_ENCRYPTION_KEY: "{{`{{ .denLinkKey }}`}}"
         S3_ACCESS_KEY_ID: "{{`{{ .s3AccessKey }}`}}"
         S3_SECRET_ACCESS_KEY: "{{`{{ .s3SecretKey }}`}}"
         WIKI_SERVICE_TOKEN: "{{`{{ .wikiToken }}`}}"
   data:
+    - secretKey: denLinkKey
+      remoteRef:
+        key: modules/wiki/den-link
+        property: key
     - secretKey: dbPassword
       remoteRef:
         key: infra/postgres/roles/wiki
