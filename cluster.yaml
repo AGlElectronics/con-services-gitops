@@ -54,6 +54,8 @@ den:
 modules:
   stash:   { enabled: false, version: "1.0.0-1" }   # inventory, sign-outs, Lost & Found
   hr:      { enabled: false, version: "1.0.0-1" }   # people, departments, onboarding
+  # Rally is not in the 1.0.0 release: the chart tag rally/v1.0.0 does not
+  # exist yet. Leave enabled: false until Rally is released.
   rally:   { enabled: false, version: "1.0.0-1" }   # events and schedule (events.<domain>)
   finance: { enabled: false, version: "1.0.0-1" }   # invoices and money tracking
   learn:   { enabled: false, version: "1.0.0-1" }   # training courses and quizzes

@@ -1,10 +1,12 @@
 # Con Services GitOps template
 
-> [!WARNING]
-> ## **NOT READY FOR PRODUCTION**
->
-> Con Services is under active development. Expect breaking changes, missing
-> features and bugs. Do not use it for real events or real data yet.
+This template deploys Con Services **1.0.0**. Image tags are `1.0.0-1`.
+Each app's chart is the tag `<app>/v1.0.0` in
+[`AGlElectronics/con-services`](https://github.com/AGlElectronics/con-services)
+(`den/v1.0.0`, `hr/v1.0.0`, and the same for Stash, Finance, Learn, Wiki,
+Desk and Tasks). **Rally is not in the 1.0.0 release:** there is no chart
+tag `rally/v1.0.0` yet, and `modules.rally.enabled` stays `false` until
+Rally is released.
 
 A blank production template for running Con Services on Kubernetes with
 [Argo CD](https://argo-cd.readthedocs.io/). You make your own private copy,
@@ -158,7 +160,8 @@ setting too (`den.host`, `modules.<name>.host`, `keycloak.host`).
   because a push *is* the deployment.
 - **No secret in Git.** Secrets live in OpenBao; External Secrets Operator
   creates the Kubernetes Secrets (`ExternalSecret` objects are in Git,
-  their values are not).
+  their values are not). The paths, including `DEN_CREDENTIAL_KEY`, are
+  listed in [Secrets](docs/secrets.md).
 - **Data is never deleted by Argo CD.** The Applications holding the
   namespaces and the database have no deletion finalizer, and databases
   use `databaseReclaimPolicy: retain`.
@@ -171,6 +174,19 @@ setting too (`den.host`, `modules.<name>.host`, `keycloak.host`).
     CI (`.github/workflows/validate.yml`) additionally renders every
     Application, checks resources and image tags, and validates the output
     against the Kubernetes schemas.
+
+    To render before the chart tags exist, point the script at a checkout
+    of `con-services` (it reads `deploy/charts/` from disk; it does not
+    need the tags `den/v1.0.0` and the rest):
+
+    ```powershell
+    $env:CONSERVICES_REPO = "C:\path\to\con-services"
+    python ci/render.py --values examples/cluster.example-filled.yaml --out build/rendered
+    python ci/check.py build/rendered
+    ```
+
+    `--main-repo` is the same path when you do not want the environment
+    variable. CI checks the repository out and passes `--main-repo`.
 
 ## License
 

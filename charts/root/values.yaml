@@ -125,6 +125,8 @@ charts:
 modules:
   stash:   { enabled: false, version: "1.0.0-1", chartRevision: "", host: stash, accessConfig: "", values: {} }
   hr:      { enabled: false, version: "1.0.0-1", chartRevision: "", host: hr, values: {} }
+  # Rally is not released with 1.0.0. rally/v1.0.0 is not a chart tag yet,
+  # so a real cluster.yaml keeps enabled: false.
   rally:
     enabled: false
     version: "1.0.0-1"

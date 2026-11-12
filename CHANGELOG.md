@@ -10,11 +10,26 @@ First release of the template (1.0.0).
 
 ### Added
 
+- `DEN_CREDENTIAL_KEY` is generated once per installation in OpenBao at
+  `modules/den/credential-key` (property `key`, 48 letters and digits) and
+  copied into `den-secrets`. Den derives each paired module's credential
+  from it, so it can call `GET /api/portal/todos`. An upgrade does not
+  replace the value. Deleting the entry and letting External Secrets write
+  a new one invalidates those derived credentials: portal to-dos stay empty
+  until every module is paired again, and modules keep reaching Den until
+  then. Inventory: [docs/secrets.md](docs/secrets.md).
+- Wiki, when HR is enabled, gets `HR_DIRECTORY_URL` pointed at HR's
+  in-cluster backend and `networkPolicy.hr` turned on, so the share dialog
+  can list HR's groups with `HR_DIRECTORY_TOKEN`.
+- `ci/render.py` accepts `CONSERVICES_REPO` as well as `--main-repo`, a
+  checkout of `con-services` whose `deploy/charts/` are rendered when the
+  chart tags `<app>/v1.0.0` are not on the remote yet. On Windows, Helm 4
+  is given the template path with a backslash (`--show-only`).
 - Den's ExternalSecret maps optional `DEN_SMTP_PASSWORD` from OpenBao
   `modules/den/smtp` (property `password`). The entry is not generated.
   `openbao-seed.sh` and `.ps1` ask for it; leaving it unset does not
   Degrade Den (modules send mail without a login).
-- Desk stores mail in its own bucket. `modules/desk/s3` is a manual OpenBao entry and `desk-secrets` receives `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`. Rendered Desk values enable S3 egress and Google API egress. `modules/desk/google` (`credentials.json`) is optional: leave it unset to run Desk on IMAP only. `DESK_SECRET_KEY_PREVIOUS` is filled from the optional `previous` property of `modules/desk/secret-key` while that key is rotated.
+- Desk stores mail in its own bucket. `modules/desk/s3` is a manual OpenBao entry and `desk-secrets` receives `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`. Rendered Desk values enable S3 egress. With `modules.desk.values.google.enabled: true`, Secret `desk-google` (key `service-account.json`) is filled from `modules/desk/google`. Leave that flag false to run Desk on IMAP only. Do not delete `modules/desk/secret-key`: External Secrets 2.14 cannot copy an optional `previous` property, so rotating that key without the old value makes stored mailbox passwords unreadable.
 
 - Learn's anonymous-feedback pepper is generated in OpenBao at
   `modules/learn/feedback-pepper` (property `pepper`) and copied into
@@ -277,3 +292,37 @@ First release of the template (1.0.0).
   never on a command line, never print a value (hidden answers show only
   their length and first and last four characters), and never store the
   OpenBao administrator's token in the cluster.
+
+### Changed
+
+- Learn's `CORS_ALLOWED_ORIGINS` is Learn's own host only. Learn no longer
+  reads `OIDC_EXTRA_AUDIENCES` or Den's client `den-spa`; portal to-dos are
+  a call from Den's backend.
+- Learn and Rally set `S3_PUBLIC_BASE_URL` empty. Managed S3 is already an
+  address the browser can open; the chart default
+  `https://s3.conservices.test` would rewrite presigned links to a host this
+  template does not run.
+- Den lists every enabled module with `internal_url` set to that module's
+  in-cluster backend (`https://<app>-backend.conservices-<app>.svc:8080`),
+  which is where `networkPolicy.allowToModules` and each module's
+  `networkPolicy.den` allow the portal to-do and role-catalog calls. Den
+  does not update a module it has already registered: on an existing
+  installation, set `internal_url` on the Modules page.
+- Rendered values set `networkPolicy.den` on every module and
+  `networkPolicy.allowToModules` on Den (both on, port 8080).
+- Stash and Rally no longer get `accessConfig.enabled`. Those charts have
+  no such key; they always mount the access ConfigMap.
+- Desk's Google service-account key is Secret `desk-google`, key
+  `service-account.json`, which is what the 1.0.0 Desk chart mounts.
+  `modules.desk.values.google.enabled: true` turns the mount and Google API
+  egress on. Leaving it false keeps Desk on IMAP. `EXTRA_FRAME_SRC` for
+  Desk's web app is `about:srcdoc`.
+- External Secrets 2.14's ExternalSecret has no `remoteRef.optional`. Those
+  fields are gone. SMTP and Telegram entries must exist; skipping them in
+  `openbao-seed.sh` / `.ps1` stores an empty value so the feature stays off
+  and the ExternalSecret can still sync. A missing entry stops that sync.
+- Rally stays `enabled: false` in `cluster.yaml`. Rally is not in the 1.0.0
+  release, so the chart tag `rally/v1.0.0` does not exist yet.
+- Module image tags and chart tags for this release are `1.0.0-1` and
+  `<app>/v1.0.0`. Keycloak stays 26.8.2 and PostgreSQL stays
+  `ghcr.io/cloudnative-pg/postgresql:16.15-standard-trixie`.

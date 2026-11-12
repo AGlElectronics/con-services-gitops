@@ -14,5 +14,8 @@ modules:
   rally:
     host: con
     submit: { enabled: true, host: cfp }
+  finance: { host: ledger }
+  learn: { host: courses }
   wiki: { host: docs }
+  desk: { host: support }
   tasks: { host: todo }

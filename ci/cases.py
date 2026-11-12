@@ -102,10 +102,12 @@ def small(out):
     print("small profile: checked")
 
 
-DEFAULT_HOST = re.compile(r"\b(den|auth|auth-admin|events|submit|stash|hr|wiki|tasks)\.example\.org\b")
+DEFAULT_HOST = re.compile(
+    r"\b(den|auth|auth-admin|events|submit|stash|hr|finance|learn|wiki|desk|tasks)\.example\.org\b")
 CUSTOM = ["portal.example.org", "login.example.org/realms/conservices", "login-admin.example.org",
           "con.example.org", "cfp.example.org", "inventory.example.org", "people.example.org",
-          "docs.example.org", "todo.example.org"]
+          "ledger.example.org", "courses.example.org", "docs.example.org", "support.example.org",
+          "todo.example.org"]
 
 
 def hosts(out):

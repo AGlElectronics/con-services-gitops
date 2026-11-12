@@ -33,12 +33,8 @@ spec:
         # Encrypts the Den credential the module stores (shared denlink).
         DEN_LINK_ENCRYPTION_KEY: "{{`{{ .denLinkKey }}`}}"
         DESK_SECRET_KEY: "{{`{{ .deskSecretKey }}`}}"
-        # Empty until you set property "previous" on modules/desk/secret-key (rotation).
-        DESK_SECRET_KEY_PREVIOUS: "{{`{{ .deskSecretPrevious }}`}}"
         S3_ACCESS_KEY_ID: "{{`{{ .s3AccessKey }}`}}"
         S3_SECRET_ACCESS_KEY: "{{`{{ .s3SecretKey }}`}}"
-        # Empty until modules/desk/google exists. Not an env var (the name is not one).
-        google-service-account.json: {{`{{ .googleSA | quote }}`}}
         {{- if has "hr" .Values.enabledModules }}
         # Same value as hr-secrets. HR reads this catalog with it.
         HR_SERVICE_TOKEN: "{{`{{ .hrServiceToken }}`}}"
@@ -56,11 +52,6 @@ spec:
       remoteRef:
         key: modules/desk/secret-key
         property: key
-    - secretKey: deskSecretPrevious
-      remoteRef:
-        key: modules/desk/secret-key
-        property: previous
-        optional: true
     - secretKey: s3AccessKey
       remoteRef:
         key: modules/desk/s3
@@ -69,15 +60,41 @@ spec:
       remoteRef:
         key: modules/desk/s3
         property: secret_key
-    - secretKey: googleSA
-      remoteRef:
-        key: modules/desk/google
-        property: credentials.json
-        optional: true
     {{- if has "hr" .Values.enabledModules }}
     - secretKey: hrServiceToken
       remoteRef:
         key: modules/hr/service-token
         property: hr_service_token
     {{- end }}
+{{- if .Values.google }}
+---
+# Google Workspace service-account key. Rendered only when
+# modules.desk.values.google.enabled is true. The Desk chart then mounts
+# Secret desk-google (key service-account.json). Store the JSON at
+# modules/desk/google first; an empty file is not a valid key.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: desk-google
+  namespace: conservices-desk
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: openbao
+  target:
+    name: desk-google
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        service-account.json: "{{`{{ .googleSA }}`}}"
+  data:
+    - secretKey: googleSA
+      remoteRef:
+        key: modules/desk/google
+        property: credentials.json
+{{- end }}
 {{- end }}

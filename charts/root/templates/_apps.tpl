@@ -53,6 +53,30 @@ networkPolicy:
   google:
     enabled: true
   {{- end }}
+  {{- if .moduleDen }}
+  # den-backend calls this module: role catalog and portal to-dos.
+  den:
+    enabled: true
+    namespace: conservices-den
+    port: 8080
+  {{- end }}
+  {{- if .allowToModules }}
+  # den-backend calls every module backend: role catalog and portal to-dos.
+  allowToModules:
+    enabled: true
+    port: 8080
+  {{- end }}
+  {{- if .wiki }}
+  # The chart's extraEgress always names conservices-hr. Use networkPolicy.hr
+  # when HR is enabled, and no extra rule when it is not.
+  extraEgress: []
+  {{- if .wikiHr }}
+  hr:
+    enabled: true
+    namespace: conservices-hr
+    port: 8080
+  {{- end }}
+  {{- end }}
 {{- end }}
 
 {{/* S3 settings of an app's config. Argument: dict s3 (root.s3 as dict), bucket. */}}
@@ -76,7 +100,7 @@ S3_USE_PATH_STYLE: {{ .s3.pathStyle | quote }}
 {{- range $n := fromJsonArray (include "root.enabledModules" .) }}
 {{- $mm := index $meta $n }}
 {{- if $mm.s3 }}{{ $buckets = append $buckets (printf "%s-conservices-%s" $s3.prefix $n) }}{{ end }}
-{{- $prereg = append $prereg (dict "slug" $mm.slug "display_name" $mm.title "base_url" (printf "https://%s" (include "root.fqdn" (dict "root" $ "host" (index $v.modules $n).host)))) }}
+{{- $prereg = append $prereg (dict "slug" $mm.slug "display_name" $mm.title "base_url" (printf "https://%s" (include "root.fqdn" (dict "root" $ "host" (index $v.modules $n).host))) "internal_url" (printf "https://%s-backend.conservices-%s.svc.cluster.local:8080" $n $n)) }}
 {{- end }}
 image:
   backend: { tag: {{ $tag | quote }} }
@@ -124,7 +148,7 @@ operatorConfig:
   FILES_S3_REGION: {{ $s3.region | quote }}
   FILES_S3_USE_PATH_STYLE: {{ $s3.pathStyle | quote }}
   FILES_S3_BUCKETS: {{ join "," $buckets | quote }}
-{{ include "root.appCommon" (dict "root" . "host" $denHost "s3" true "fqdns" $s3.backupFqdns) }}
+{{ include "root.appCommon" (dict "root" . "host" $denHost "s3" true "fqdns" $s3.backupFqdns "allowToModules" true) }}
 {{- end }}
 
 {{/* A module. Argument: dict root, name. */}}
@@ -152,7 +176,10 @@ den:
   mode: required
 {{- if $meta.access }}
 accessConfig:
+  {{- /* Stash and Rally always mount the ConfigMap; they have no enabled flag. */}}
+  {{- if not (or (eq $n "stash") (eq $n "rally")) }}
   enabled: true
+  {{- end }}
   existingConfigMap: {{ $n }}-access-config
 {{- end }}
 # The web app's /config.json (the image names no domain).
@@ -170,6 +197,8 @@ frontend:
     keycloakOrigin: https://{{ include "root.fqdn" (dict "root" $root "host" $root.Values.keycloak.host) }}
     denOrigin: https://{{ $denHost }}
     s3Origin: {{ $s3.endpoint | quote }}
+    # Sandboxed mail iframe. The chart default is the same value.
+    extraFrameSrc: "about:srcdoc"
   {{- end }}
 config:
   APP_BASE_URL: https://{{ $host }}
@@ -179,10 +208,16 @@ config:
   ATTENDEE_OIDC_ISSUER_URL: {{ include "root.issuer" (dict "root" $root "realm" "attendees") }}
   PUBLIC_SCHEDULE_ENABLED: "false"
   PUBLIC_API_BUILTIN_KEY: ""
+  # Managed S3 is already browser-reachable. The chart default would rewrite
+  # presigned links to https://s3.conservices.test.
+  S3_PUBLIC_BASE_URL: ""
   {{- else if eq $n "learn" }}
-  CORS_ALLOWED_ORIGINS: https://{{ $host }},https://{{ $denHost }}
+  # Learn's own origin only. Portal to-dos are a server call from Den, so
+  # Den's host and den-spa are not an audience or a CORS origin.
+  CORS_ALLOWED_ORIGINS: https://{{ $host }}
   PUBLIC_BASE_URL: https://{{ $host }}
   SMTP_FROM: {{ $v.smtp.from | default (printf "no-reply@%s" $d) | quote }}
+  S3_PUBLIC_BASE_URL: ""
   {{- else }}
   CORS_ALLOWED_ORIGINS: https://{{ $host }}
   {{- end }}
@@ -200,6 +235,10 @@ config:
   ROLE_CATALOG_SOURCES: {{ join "," $catalogs | quote }}
   LEARN_HOLDINGS_URL: {{ ternary "https://learn-backend.conservices-learn.svc.cluster.local:8080/api/internal/holdings" "" (has "learn" $enabled) | quote }}
   {{- end }}
+  {{- if and (eq $n "wiki") (has "hr" $enabled) }}
+  # Share dialog group picker. The token is HR_DIRECTORY_TOKEN in wiki-secrets.
+  HR_DIRECTORY_URL: https://hr-backend.conservices-hr.svc.cluster.local:8080
+  {{- end }}
   {{- if $meta.s3 }}
   {{- include "root.appS3Config" (dict "s3" $s3 "bucket" (printf "%s-conservices-%s" $s3.prefix $n)) | nindent 2 }}
   {{- end }}
@@ -215,7 +254,8 @@ submit:
     oidcClientId: rally-submit
     publicScheduleKey: ""
 {{- end }}
-{{ include "root.appCommon" (dict "root" $root "host" $host "s3" $meta.s3 "fqdns" $s3.fqdns "google" (eq $n "desk")) }}
+{{- $deskGoogle := and (eq $n "desk") (dig "google" "enabled" false ($m.values | default dict)) }}
+{{ include "root.appCommon" (dict "root" $root "host" $host "s3" $meta.s3 "fqdns" $s3.fqdns "google" $deskGoogle "moduleDen" true "wiki" (eq $n "wiki") "wikiHr" (and (eq $n "wiki") (has "hr" $enabled))) }}
 {{- if eq $n "hr" }}
   {{- $egress := list }}
   {{- range $t := list "stash" "rally" "learn" "wiki" "tasks" "finance" "desk" }}
@@ -239,5 +279,9 @@ accessConfig: {{ $access | quote }}
 {{- if eq .name "hr" }}
 {{- $hr := index $v.modules "hr" | default dict }}
 googleWorkspace: {{ dig "googleWorkspace" "enabled" false ($hr.values | default dict) }}
+{{- end }}
+{{- if eq .name "desk" }}
+{{- $desk := index $v.modules "desk" | default dict }}
+google: {{ dig "google" "enabled" false ($desk.values | default dict) }}
 {{- end }}
 {{- end }}

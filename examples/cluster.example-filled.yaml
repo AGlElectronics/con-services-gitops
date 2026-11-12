@@ -53,12 +53,24 @@ modules:
   hr:
     enabled: true
     version: "1.0.0-1"
+  # Rally is not in the 1.0.0 release (no chart tag rally/v1.0.0 yet).
+  # Enabled here so CI can render the chart from a local checkout.
+  # cluster.yaml leaves it false.
   rally:
     enabled: true
     version: "1.0.0-1"
     submit:
       enabled: false
+  finance:
+    enabled: true
+    version: "1.0.0-1"
+  learn:
+    enabled: true
+    version: "1.0.0-1"
   wiki:
+    enabled: true
+    version: "1.0.0-1"
+  desk:
     enabled: true
     version: "1.0.0-1"
   tasks:

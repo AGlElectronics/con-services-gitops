@@ -17,6 +17,11 @@ Needs helm and kubectl on PATH, and PyYAML.
   python3 ci/render.py --values examples/cluster.example-filled.yaml \
       --main-repo ../con-services --out build/rendered
 
+--main-repo is a checkout of AGlElectronics/con-services (charts in
+deploy/charts/). Chart tags such as den/v1.0.0 do not have to exist:
+the script reads the files in that checkout. Set CONSERVICES_REPO to the
+same path to omit --main-repo.
+
 --values may be repeated (later files win, as with helm -f), for example
 with ci/no-modules.yaml for an installation with Den only.
 """
@@ -25,6 +30,7 @@ import argparse
 import os
 import pathlib
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -52,6 +58,23 @@ def run(cmd, **kw):
         sys.stderr.write(f"FAILED: {' '.join(map(str, cmd))}\n{res.stderr}\n")
         sys.exit(1)
     return res.stdout
+
+
+def show_only(cmd, template):
+    """Render one template. Helm 3 takes templates/name.yaml. Helm 4 on
+    Windows matches that name with a backslash, so try both."""
+    names = [template]
+    native = template.replace("/", os.sep)
+    if native not in names:
+        names.append(native)
+    last = ""
+    for name in names:
+        res = subprocess.run(cmd + ["--show-only", name], capture_output=True, text=True)
+        if res.returncode == 0:
+            return res.stdout
+        last = res.stderr
+    sys.stderr.write(f"FAILED: {' '.join(map(str, cmd))} --show-only {template}\n{last}\n")
+    sys.exit(1)
 
 
 def helm_template(release, chart, namespace, value_files, values_obj, extra, tmp):
@@ -87,12 +110,23 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--values", required=True, action="append",
                     help="cluster.yaml to render; repeat to lay files over each other")
-    ap.add_argument("--main-repo", required=True, help="checkout of AGlElectronics/con-services")
+    ap.add_argument("--main-repo", default=os.environ.get("CONSERVICES_REPO"),
+                    help="checkout of AGlElectronics/con-services (or set CONSERVICES_REPO)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
+    if not args.main_repo:
+        sys.exit("FAILED: pass --main-repo or set CONSERVICES_REPO to a checkout of AGlElectronics/con-services")
 
     out = pathlib.Path(args.out)
-    shutil.rmtree(out, ignore_errors=True)
+
+    def _rm_retry(func, path, _exc):
+        # Windows leaves some files read-only; ignore_errors would then
+        # make the following mkdir fail because the directory is still there.
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+
+    if out.exists():
+        shutil.rmtree(out, onerror=_rm_retry)
     out.mkdir(parents=True)
     cmd = ["helm", "template", "root", str(REPO / "charts/root")]
     for f in args.values:
@@ -100,7 +134,7 @@ def main():
     root = run(cmd)
     (out / "root.yaml").write_text(root, encoding="utf-8")
     # The seed plan (what OpenBao must hold), for ci/check.py.
-    plan = run(cmd + ["--set", "global.seedPlan=true", "--show-only", "templates/seed-plan.yaml"])
+    plan = show_only(cmd + ["--set", "global.seedPlan=true"], "templates/seed-plan.yaml")
     plan_line = next((l for l in plan.splitlines() if l.startswith("{")), None)
     if plan_line is None:
         sys.exit("FAILED: no seed plan in charts/root/templates/seed-plan.yaml")

@@ -10,8 +10,9 @@
 # CloudNativePG uses for the role (charts/postgres), so they always
 # agree. Passwords are hex, so they need no escaping inside the URL.
 #
-# TELEGRAM_BOT_TOKEN and SMTP_PASSWORD are optional (remoteRef optional):
-# a missing OpenBao entry becomes an empty value and the feature stays off.
+# TELEGRAM_BOT_TOKEN and SMTP_PASSWORD: an empty value keeps the feature off.
+# The OpenBao entry must exist. External Secrets 2.14 cannot skip a missing
+# key. openbao-seed stores an empty value when you skip the prompt.
 # HR_SERVICE_TOKEN is included only when HR is enabled: one generated value,
 # the same key in hr-secrets, so HR can read the role catalog.
 apiVersion: external-secrets.io/v1
@@ -72,10 +73,8 @@ spec:
       remoteRef:
         key: modules/stash/telegram
         property: token
-        optional: true
     - secretKey: smtpPassword
       remoteRef:
         key: modules/stash/smtp
         property: password
-        optional: true
 {{- end }}

@@ -41,7 +41,12 @@
 #   conservices/modules/den/smtp             password   (optional; not generated)
 #   conservices/modules/<module>/s3          access_key, secret_key, for the
 #                                            enabled modules with files
-#                                            (stash rally learn wiki tasks)
+#                                            (stash, rally, finance, learn,
+#                                            wiki, desk, tasks)
+#   conservices/modules/desk/google          credentials.json (optional)
+#   conservices/modules/learn/telegram       token (optional; Learn on)
+# DEN_CREDENTIAL_KEY is not asked for: External Secrets generates
+# conservices/modules/den/credential-key (property key) once.
 #   conservices/modules/stash/telegram       token      (optional; Stash on)
 #   conservices/modules/stash/smtp           password   (optional; Stash on)
 #   conservices/infra/keycloak/smtp          host, port, from, username,
@@ -221,7 +226,7 @@ section_of() {
     den-smtp) echo "Den SMTP password (optional, shared by paired modules)" ;;
     cloudflare) echo "Cloudflare API token (Let's Encrypt DNS-01)" ;;
     ghcr) echo "GitHub Container Registry (private images)" ;;
-    google) echo "Google Workspace service account for Desk (optional)" ;;
+    google) echo "Google Workspace service account (optional)" ;;
   esac
 }
 
@@ -314,11 +319,33 @@ ask_den_smtp() {
 
 ask_google() {
   local p=${PATHS[$1]} f
-  prompt_value f "  Path to the service-account JSON (empty = skip; Desk stays on IMAP): " text 0 1 || return 1
+  prompt_value f "  Path to the service-account JSON (empty = skip): " text 0 1 || return 1
   [[ -n "$f" ]] || return 1
   [[ -f "$f" ]] || { bad "No file at that path."; return 1; }
   # Compact JSON on stdin. The key is not printed and is not a command argument.
   jq -c . "$f" | put "$p" credentials.json || exit 1
+}
+
+# write_blank <i>: stores empty strings for an optional entry. External
+# Secrets 2.14 has no optional remoteRef, so a missing path stops the
+# ExternalSecret. An empty value keeps the feature off and lets it sync.
+write_blank() {
+  local i=$1 p=${PATHS[$1]}
+  local -a args=() parts=()
+  local n
+  IFS=',' read -r -a parts <<< "${FIELDS[$i]}"
+  for n in "${parts[@]}"; do
+    n="${n#"${n%%[![:space:]]*}"}"
+    n="${n%"${n##*[![:space:]]}"}"
+    [[ -n "$n" ]] || continue
+    args+=("$n")
+  done
+  [[ ${#args[@]} -gt 0 ]] || return 1
+  local lines=""
+  for n in "${args[@]}"; do
+    lines+=$'\n'
+  done
+  printf '%s' "$lines" | put "$p" "${args[@]}" || exit 1
 }
 
 ask_entry() {
@@ -354,7 +381,7 @@ for i in "${!PATHS[@]}"; do
   json=""
   if [[ "$PROMPT" == 0 ]]; then
     if [[ "${OPTIONAL[$i]}" == true ]]; then
-      warn "$OPENBAO_KV/$p is not set (${FIELDS[$i]}); optional, so the feature stays off"
+      warn "$OPENBAO_KV/$p is not set (${FIELDS[$i]}). An empty value keeps the feature off; this script stores one when you skip the prompt. Until then the ExternalSecret cannot sync."
     else
       bad "$OPENBAO_KV/$p is missing (${FIELDS[$i]}); Application(s) ${APPS[$i]} stay Degraded"
       missing "$i"
@@ -377,7 +404,9 @@ for i in "${!PATHS[@]}"; do
     KEPT+=("$p")
   else
     if [[ "${OPTIONAL[$i]}" == true ]]; then
-      warn "$OPENBAO_KV/$p skipped; the feature stays off until the entry exists"
+      write_blank "$i"
+      warn "$OPENBAO_KV/$p: stored empty ${FIELDS[$i]}. The feature stays off until you replace it (--overwrite)."
+      WRITTEN+=("$p")
     else
       warn "$OPENBAO_KV/$p skipped; Application(s) ${APPS[$i]} stay Degraded until it exists"
       missing "$i"

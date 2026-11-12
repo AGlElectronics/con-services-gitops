@@ -9,8 +9,9 @@
 # CloudNativePG uses for the role (charts/postgres), so they always
 # agree. Passwords are hex, so they need no escaping inside the URL.
 #
-# TELEGRAM_BOT_TOKEN is optional (remoteRef optional): a missing OpenBao
-# entry becomes empty and Telegram stays off. SMTP_PASSWORD is not included.
+# TELEGRAM_BOT_TOKEN: an empty value keeps Telegram off. The OpenBao entry
+# must exist. External Secrets 2.14 cannot skip a missing key. openbao-seed
+# stores an empty token when you skip the prompt. SMTP_PASSWORD is not included.
 # HR_SERVICE_TOKEN is included when HR is enabled: the same generated value
 # as hr-secrets, so HR can read Learn's role catalog.
 apiVersion: external-secrets.io/v1
@@ -79,7 +80,6 @@ spec:
       remoteRef:
         key: modules/learn/telegram
         property: token
-        optional: true
     {{- if has "hr" .Values.enabledModules }}
     - secretKey: hrServiceToken
       remoteRef:

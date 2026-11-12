@@ -140,9 +140,13 @@ that stay Degraded without it, and what the value is.
 {{- $manual = append $manual (dict "path" "modules/stash/smtp" "kind" "password" "fields" (list "password") "apps" (list "stash") "optional" true
     "what" "Password of the SMTP server in Stash settings. Leave it unset to send mail without a login.") }}
 {{- end }}
-{{- if has "desk" $enabled }}
-{{- $manual = append $manual (dict "path" "modules/desk/google" "kind" "google" "fields" (list "credentials.json") "apps" (list "desk") "optional" true
-    "what" "Google Workspace service-account key (JSON) for Desk. Leave it unset to use IMAP only. Also authorise the scopes on the Google Workspace page, and set networkPolicy.google (the GitOps values turn that on).") }}
+{{- if and (has "desk" $enabled) (dig "google" "enabled" false (((index $v.modules "desk").values) | default dict)) }}
+{{- $manual = append $manual (dict "path" "modules/desk/google" "kind" "google" "fields" (list "credentials.json") "apps" (list "desk")
+    "what" "Google Workspace service-account key (JSON) for Desk. The chart mounts Secret desk-google, key service-account.json, and opens networkPolicy.google, when modules.desk.values.google.enabled is true. Not generated.") }}
+{{- end }}
+{{- if and (has "hr" $enabled) (dig "googleWorkspace" "enabled" false (((index $v.modules "hr").values) | default dict)) }}
+{{- $manual = append $manual (dict "path" "modules/hr/google-workspace" "kind" "google" "fields" (list "credentials.json") "apps" (list "hr")
+    "what" "Google Workspace service-account key (JSON) for HR. Not generated. The chart mounts Secret hr-google-workspace, key credentials.json, when modules.hr.values.googleWorkspace.enabled is true.") }}
 {{- end }}
 {{- /* Optional: a missing entry does not Degrade Den. remoteRef optional on the ExternalSecret. Not generated. */ -}}
 {{- $manual = append $manual (dict "path" "modules/den/smtp" "kind" "den-smtp" "fields" (list "password") "apps" (list "den") "optional" true
@@ -163,6 +167,10 @@ that stay Degraded without it, and what the value is.
 {{- $gen := list (dict "path" "infra/postgres/superuser" "properties" (list "password")) }}
 {{- range $roles }}{{ $gen = append $gen (dict "path" (printf "infra/postgres/roles/%s" .) "properties" (list "password")) }}{{ end }}
 {{- $gen = append $gen (dict "path" "modules/den/operator-token" "properties" (list "token")) }}
+{{- /* DEN_CREDENTIAL_KEY. Own generator so property "key" is not Desk's secret-key.
+       48 letters and digits (at least 32). IfNotExists: an upgrade never replaces it.
+       Replacing it invalidates every module credential Den derives for portal to-dos. */ -}}
+{{- $gen = append $gen (dict "path" "modules/den/credential-key" "properties" (list "key") "generator" "credential") }}
 {{- range $tokens }}{{ $gen = append $gen (dict "path" (printf "modules/%s/service-token" .) "properties" (list "token")) }}{{ end }}
 {{- if has "hr" $enabled }}
 {{- /* Distinct property names: the shared "token" generator key is one value for every path that uses it. */ -}}

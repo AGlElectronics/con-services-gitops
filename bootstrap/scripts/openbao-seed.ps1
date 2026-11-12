@@ -5,8 +5,8 @@ Enter the secrets only you know (provider credentials) into OpenBao.
 .DESCRIPTION
 The PowerShell version of openbao-seed.sh, for Windows PowerShell 5.1 and
 PowerShell 7. One way of several: the OpenBao web UI or "bao kv put" work
-just as well. The random values (database passwords, tokens, client
-secrets) are not here: External Secrets Operator creates them.
+just as well. The random values (database passwords, tokens, client secrets,
+DEN_CREDENTIAL_KEY) are not here: External Secrets Operator creates them.
 
 It reads cluster.yaml (through the root chart, so helm is needed) and asks
 for every entry the enabled modules and options need, below the KV mount
@@ -17,8 +17,11 @@ openbao.kvPath (default "conservices"):
   conservices/modules/den/files-s3       access_key, secret_key (read only)
   conservices/modules/den/backup-s3      access_key, secret_key
   conservices/modules/den/smtp           password (optional, not generated)
-  conservices/modules/<module>/s3        access_key, secret_key (stash rally
-                                         learn wiki tasks, when enabled)
+  conservices/modules/<module>/s3        access_key, secret_key (stash, rally,
+                                         finance, learn, wiki, desk, tasks,
+                                         when enabled)
+  conservices/modules/desk/google        credentials.json (optional)
+  conservices/modules/learn/telegram     token (optional, when Learn is on)
   conservices/modules/stash/telegram     token (optional, when Stash is on)
   conservices/modules/stash/smtp         password (optional, when Stash is on)
   conservices/infra/keycloak/smtp        host, port, from, username, password
@@ -266,7 +269,7 @@ function Request-Cloudflare($e) {
 }
 
 function Request-Google($e) {
-    $path = Read-ConValue -Prompt '  Path to the service-account JSON (empty = skip; Desk stays on IMAP)' -Kind 'text' -Optional
+    $path = Read-ConValue -Prompt '  Path to the service-account JSON (empty = skip)' -Kind 'text' -Optional
     if (-not $path) { return $false }
     if (-not (Test-Path -LiteralPath $path)) { Write-Bad "No file at that path."; return $false }
     $json = Get-Content -LiteralPath $path -Raw
@@ -293,7 +296,7 @@ $sections = @{
     'den-smtp' = "Den SMTP password (optional, shared by paired modules)"
     cloudflare = "Cloudflare API token (Let's Encrypt DNS-01)"
     ghcr       = 'GitHub Container Registry (private images)'
-    google     = 'Google Workspace service account for Desk (optional)'
+    google     = 'Google Workspace service account (optional)'
 }
 $current = ''
 foreach ($e in $entries) {
@@ -312,7 +315,7 @@ foreach ($e in $entries) {
     $data = $null
     if (-not $Prompt) {
         if ($e.optional) {
-            Write-Warn "$Kv/$p is not set ($($e.fields -join ', ')); optional, so the feature stays off"
+            Write-Warn "$Kv/$p is not set ($($e.fields -join ', ')). An empty value keeps the feature off; this script stores one when you skip the prompt. Until then the ExternalSecret cannot sync."
         } else {
             Write-Bad "$Kv/$p is missing ($($e.fields -join ', ')); Application(s) $($e.apps -join ', ') stay Degraded"
             Add-Missing $e
@@ -338,7 +341,13 @@ foreach ($e in $entries) {
         Write-Warn "$Kv/${p}: nothing entered, keeping the current value"
         [void]$kept.Add($p)
     } elseif ($e.optional) {
-        Write-Warn "$Kv/$p skipped; the feature stays off until the entry exists"
+        # External Secrets 2.14 has no optional remoteRef. An empty value
+        # keeps the feature off and lets the ExternalSecret sync.
+        $blank = [ordered]@{}
+        foreach ($f in @($e.fields)) { $blank[$f] = '' }
+        Set-KvEntry $Token $e.path $blank
+        Write-Warn "$Kv/${p}: stored empty $($e.fields -join ', '). The feature stays off until you replace it (-Overwrite)."
+        [void]$written.Add("$Kv/$p")
     } else {
         Write-Warn "$Kv/$p skipped; Application(s) $($e.apps -join ', ') stay Degraded until it exists"
         Add-Missing $e

@@ -11,3 +11,6 @@ accessConfig: ""
 # HR only: mount the Google Workspace key from OpenBao modules/hr/google-workspace.
 # Set from modules.hr.values.googleWorkspace.enabled in cluster.yaml.
 googleWorkspace: false
+# Desk only: create Secret desk-google from modules/desk/google.
+# Set from modules.desk.values.google.enabled in cluster.yaml.
+google: false
