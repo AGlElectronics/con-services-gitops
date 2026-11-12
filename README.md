@@ -3,10 +3,8 @@
 This template deploys Con Services **1.0.0**. Image tags are `1.0.0-1`.
 Each app's chart is the tag `<app>/v1.0.0` in
 [`AGlElectronics/con-services`](https://github.com/AGlElectronics/con-services)
-(`den/v1.0.0`, `hr/v1.0.0`, and the same for Stash, Finance, Learn, Wiki,
-Desk and Tasks). **Rally is not in the 1.0.0 release:** there is no chart
-tag `rally/v1.0.0` yet, and `modules.rally.enabled` stays `false` until
-Rally is released.
+(`den/v1.0.0`, `hr/v1.0.0`, and the same for Rally, Stash, Finance, Learn,
+Wiki, Desk and Tasks).
 
 A blank production template for running Con Services on Kubernetes with
 [Argo CD](https://argo-cd.readthedocs.io/). You make your own private copy,

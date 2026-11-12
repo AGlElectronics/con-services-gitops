@@ -321,8 +321,6 @@ First release of the template (1.0.0).
   fields are gone. SMTP and Telegram entries must exist; skipping them in
   `openbao-seed.sh` / `.ps1` stores an empty value so the feature stays off
   and the ExternalSecret can still sync. A missing entry stops that sync.
-- Rally stays `enabled: false` in `cluster.yaml`. Rally is not in the 1.0.0
-  release, so the chart tag `rally/v1.0.0` does not exist yet.
 - Module image tags and chart tags for this release are `1.0.0-1` and
   `<app>/v1.0.0`. Keycloak stays 26.8.2 and PostgreSQL stays
   `ghcr.io/cloudnative-pg/postgresql:16.15-standard-trixie`.
